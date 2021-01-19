@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use iced_native::{
     event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout,
@@ -7,14 +7,75 @@ use iced_native::{
 
 use std::hash::Hash;
 
-use ganic_no_std::{pattern::Pattern};
+use ganic_no_std::pattern::Pattern;
+
+pub const STEP_WIDTH: f32 = 40.0;
+pub const STEP_HEIGHT: f32 = 40.0;
+pub const STEP_MARGIN_RIGHT: f32 = 4.0;
+pub const TRACK_MARGIN_BOTTOM: f32 = 16.0;
+pub const CONTAINER_PADDING: f32 = 12.0;
+
 
 #[derive(Debug, Clone, Copy)]
 pub struct GridEvent {
-    step: usize,
-    track: usize,
     offset: f32,
     velocity: f32
+}
+
+#[derive(Debug, Clone)]
+pub struct GridPattern {
+    data: HashMap<(usize, usize), GridEvent>
+}
+
+impl GridPattern {
+    pub fn new() -> Self {
+        GridPattern {
+            data: HashMap::new()
+        }
+    }
+
+    pub fn get_hovered(self, cursor: Point) -> Option<((usize, usize), GridEvent)>{
+        self.data.into_iter()
+            .find(|((step, track), grid_event)| {
+                let grid_event_rect = Rectangle {
+                    x: CONTAINER_PADDING + (grid_event.offset * STEP_WIDTH) + (*step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT)),
+                    y: CONTAINER_PADDING + (*track as f32 * (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)),
+                    width: STEP_WIDTH,
+                    height: STEP_HEIGHT
+                };
+    
+                grid_event_rect.contains(cursor)
+            })
+    }
+}
+
+impl From<Pattern> for GridPattern {
+    fn from(pattern: Pattern) -> Self {
+        let mut grid = GridPattern::new();
+
+        for (i, step) in pattern.iter().enumerate() {
+            for (j, perc) in step.iter().enumerate() {
+                if perc[0] > 0.0 {
+                    grid.data.insert((i, j), GridEvent { velocity: perc[0], offset: perc[1] });
+                }
+            }
+        }
+
+        grid
+    }
+}
+
+impl From<GridPattern> for Pattern {
+    fn from(grid: GridPattern) -> Self {
+        let mut pattern = Pattern::new();
+
+        for ((step, track), event) in grid.data {
+            pattern.data[step][track][0] = event.velocity;
+            pattern.data[step][track][1] = event.offset;
+        }
+
+        pattern
+    }
 }
 
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
@@ -59,47 +120,53 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self
     }
 
-    fn get_hovered(self, cursor: Point, bounds: Rectangle) -> Option<GridEvent>{
-        self.state.base_pattern.into_iter()
-            .find(|grid_event| {
-                let grid_event_rect = Rectangle {
-                    x: 0.0,
-                    y: 0.0,
-                    width: bounds.width,
-                    height: bounds.height
-                };
-
-                grid_event_rect.contains(cursor)
-            })
-    }
-
     pub fn on_action(&mut self, action: Actions, bounds: Rectangle) {
         match action {
             Actions::Drag(bounds) => {
                 if self.state.is_logo_pressed {
                     // velocity mode
-                } else if !self.state.selection.is_empty() {
-                    match self.state.modifiers {
-                        keyboard::Modifiers { alt: false, logo: true, .. } => {
-                            // micro timing
-                        },
-                        keyboard::Modifiers { alt: true, logo: false, .. } => {
-                            // duplication
-                        },
-                        keyboard::Modifiers { alt: true, logo: true, .. } => {
-                            // micro timing + duplication
-                        },
-                        keyboard::Modifiers { alt: false, logo: false, .. } => {
-                            // step move only
-                        },
-                        _ => {}
-                    }
                 } else {
-                    // draw selection and add grid events to selection
+                    match self.state.draw_mode {
+                        DrawMode::Pen => {
+                            // draw 
+                            match self.state.modifiers {
+                                keyboard::Modifiers { logo: true, .. } => {
+                                    // draw in step + micro timing mode
+
+                                },
+                                keyboard::Modifiers { logo: false, .. } => {
+                                    // draw in step mode only
+                                },
+                                _ => {}
+                            }
+                        }
+                        DrawMode::Cursor => {
+                            if !self.state.selection.data.is_empty() {
+                                match self.state.modifiers {
+                                    keyboard::Modifiers { alt: false, logo: true, .. } => {
+                                        // micro timing
+                                    },
+                                    keyboard::Modifiers { alt: true, logo: false, .. } => {
+                                        // duplication
+                                    },
+                                    keyboard::Modifiers { alt: true, logo: true, .. } => {
+                                        // micro timing + duplication
+                                    },
+                                    keyboard::Modifiers { alt: false, logo: false, .. } => {
+                                        // step move only
+                                    },
+                                    _ => {}
+                                }
+                            } else {
+                                // draw selection and add grid events to selection
+                                self.state.selection_rectangle = Some(bounds);
+                            }
+                        }
+                    }
                 }
             }
             Actions::DoubleClick(cursor) => {
-                match self.get_hovered(cursor, bounds) {
+                match self.state.base_pattern.to_owned().get_hovered(cursor) {
                     Some(grid_event) => {
                         // remove event
                     }
@@ -109,16 +176,20 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 }
             }
             Actions::Click(cursor) => {
-                match self.get_hovered(cursor, bounds) {
-                    Some(grid_event) => {
+                match self.state.selection.to_owned().get_hovered(cursor) {
+                    Some((grid_id, grid_event)) => {
                         match self.state.modifiers {
                             keyboard::Modifiers { shift: true, .. } => {
-                                // TO DO toggle event from selection
-                                // self.state.selection.push(grid_event)
+                                if self.state.selection.data.contains_key(&grid_id) {
+                                    self.state.selection.data.remove(&grid_id);
+                                } else {
+                                    self.state.selection.data.insert(grid_id, grid_event);
+                                }
                             },
                             _ => {
                                 // empty selection and add event
-                                self.state.selection = vec![grid_event]
+                                self.state.selection = GridPattern::new();
+                                self.state.selection.data.insert(grid_id, grid_event);
                             }
                         }
                     }
@@ -130,6 +201,17 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                     keyboard::KeyCode::Escape | keyboard::KeyCode::Delete => {
                         // reset dragging state 
                         self.state.reset();
+                    },
+                    keyboard::KeyCode::B => {
+                        // reset dragging state 
+                        match self.state.draw_mode {
+                            DrawMode::Pen => {
+                                self.state.draw_mode = DrawMode::Cursor;
+                            }
+                            DrawMode::Cursor => {
+                                self.state.draw_mode = DrawMode::Pen;
+                            }
+                        }
                     },
                     _ => {}
                 }
@@ -166,51 +248,57 @@ pub enum Actions {
     KeyAction(keyboard::KeyCode)
 }
 
-// pub enum Modifiers {
-//     Dragging(Rectangle),
-//     Shift,
-//     Alt,
-//     Cmd
-// }
+#[derive(Debug, Clone, Copy)]
+pub enum DrawMode {
+    Pen,
+    Cursor
+}
 
 #[derive(Debug, Clone)]
 pub struct State {
-    base_pattern: Vec<GridEvent>,
-    output_pattern: Vec<GridEvent>,
-    selection: Vec<GridEvent>,
+    base_pattern: GridPattern,
+    output_pattern: GridPattern,
+    selection: GridPattern,
+    draw_mode: DrawMode,
     is_dragging: bool,
     is_logo_pressed: bool,
     drag_origin_x: f32,
     drag_origin_y: f32,
-    drag_x: f32,
-    drag_y: f32,
+    selection_rectangle: Option<Rectangle>,
     modifiers: keyboard::Modifiers,
     last_click: Option<mouse::Click>
 }
 
 impl State {
-    pub fn new(pattern: Pattern) -> Self {
+    pub fn new(initial_pattern: Option<Pattern>) -> Self {
+        let base_pattern= {
+            match initial_pattern {
+                Some(pattern) => {
+                    GridPattern::from(pattern)
+                }
+                None => {
+                    GridPattern::new()
+                }
+            }
+        };
+
         Self {
-            base_pattern: vec![],
-            output_pattern: vec![],
-            selection: vec![],
+            base_pattern: base_pattern.clone(),
+            output_pattern: base_pattern.clone(),
+            selection: GridPattern::new(),
+            draw_mode: DrawMode::Pen,
             is_dragging: false,
             is_logo_pressed: false,
             drag_origin_x: 0.0,
             drag_origin_y: 0.0,
-            drag_x: 0.0,
-            drag_y: 0.0,
+            selection_rectangle: None,
             modifiers: Default::default(),
             last_click: None
         }
     }
 
-    pub fn set_pattern(&mut self, pattern: Vec<GridEvent>) {
-        self.base_pattern = pattern;
-    }
-
     pub fn reset(&mut self) {
-        self.selection = vec![];
+        self.selection = GridPattern::new();
         self.is_logo_pressed = false;
         self.is_logo_pressed = false;
     }
@@ -246,7 +334,7 @@ where
         event: Event,
         layout: Layout<'_>,
         cursor_position: Point,
-        messages: &mut Vec<Message>,
+        _messages: &mut Vec<Message>,
         _renderer: &Renderer,
         _clipboard: Option<&dyn Clipboard>,
     ) -> event::Status {
@@ -262,8 +350,8 @@ where
                             let drag_bounds = Rectangle {
                                 x: self.state.drag_origin_x,
                                 y: self.state.drag_origin_y,
-                                width: self.state.drag_origin_x - cursor_position.x,
-                                height: self.state.drag_origin_y - cursor_position.y
+                                width: cursor_position.x - self.state.drag_origin_x,
+                                height: cursor_position.y - self.state.drag_origin_y
                             };
 
                             self.on_action(Actions::Drag(drag_bounds), bounds);
@@ -301,6 +389,7 @@ where
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.state.is_dragging = false;
+                    self.state.selection_rectangle = None;
 
                     return event::Status::Captured;
                 }
@@ -351,8 +440,7 @@ where
         renderer.draw(
             layout.bounds(),
             cursor_position,
-            self.state.output_pattern,
-            self.state.is_dragging,
+            self.state.to_owned(),
             &self.style
         )
     }
@@ -365,34 +453,15 @@ where
         self.height.hash(state);
     }
 }
-
-/// The renderer of a [`Ramp`].
-///
-/// Your renderer will need to implement this trait before being
-/// able to use a [`Ramp`] in your user interface.
-///
-/// [`Ramp`]: struct.Ramp.html
 pub trait Renderer: iced_native::Renderer {
     /// The style supported by this renderer.
     type Style: Default;
 
-    /// Draws a [`Ramp`].
-    ///
-    /// It receives:
-    ///   * the bounds of the [`Ramp`]
-    ///   * the current cursor position
-    ///   * the current normal of the [`Ramp`]
-    ///   * whether the ramp is currently being dragged
-    ///   * the style of the [`Ramp`]
-    ///   * the direction of the ramp line of the [`Ramp`]
-    ///
-    /// [`Ramp`]: struct.Ramp.html
     fn draw(
         &mut self,
         bounds: Rectangle,
         cursor_position: Point,
-        pattern: Pattern,
-        is_dragging: bool,
+        state: State,
         style: &Self::Style
     ) -> Self::Output;
 }
