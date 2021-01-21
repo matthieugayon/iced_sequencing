@@ -1,8 +1,6 @@
 use crate::native::grid;
-use iced::Color;
-use iced_graphics::canvas::{Frame, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
-use iced_native::{mouse, Background, Point, Rectangle, Size, Vector};
+use iced_native::{mouse, Background, Point, Rectangle, Color, Size, Vector};
 
 pub use crate::native::grid::{
     State, DrawMode, STEP_HEIGHT, STEP_WIDTH, STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM, CONTAINER_PADDING
