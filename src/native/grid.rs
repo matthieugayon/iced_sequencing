@@ -9,14 +9,19 @@ use std::hash::Hash;
 
 use ganic_no_std::{NUM_PERCS, NUM_STEPS, pattern::Pattern};
 
-pub const STEP_WIDTH: f32 = 40.0;
-pub const STEP_HEIGHT: f32 = 40.0;
 pub const STEP_MARGIN_RIGHT: f32 = 4.0;
 pub const TRACK_MARGIN_BOTTOM: f32 = 16.0;
 pub const CONTAINER_PADDING: f32 = 12.0;
 pub const EVENT_WIDTH: f32 = 30.0;
 pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.15;
+
+fn get_step_dimensions(bounds: Rectangle) -> Size {
+    return Size {
+        width: ((bounds.width - (2.0 * CONTAINER_PADDING)) / NUM_STEPS as f32) - STEP_MARGIN_RIGHT,
+        height: ((bounds.height - (2.0 * CONTAINER_PADDING)) / NUM_PERCS as f32) - TRACK_MARGIN_BOTTOM
+    }    
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct GridEvent {
@@ -47,14 +52,16 @@ impl GridPattern {
         }
     }
 
-    pub fn get_hovered(self, cursor: Point) -> Option<((usize, usize), GridEvent)> {
+    pub fn get_hovered(self, cursor: Point, bounds: Rectangle) -> Option<((usize, usize), GridEvent)> {
+        let step_size = get_step_dimensions(bounds);
+        
         self.data.into_iter()
             .find(|((step, track), grid_event)| {
                 let grid_event_rect = Rectangle {
-                    x: CONTAINER_PADDING + (grid_event.offset * STEP_WIDTH) + (*step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT)),
-                    y: CONTAINER_PADDING + (*track as f32 * (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)),
-                    width: STEP_WIDTH,
-                    height: STEP_HEIGHT
+                    x: CONTAINER_PADDING + (grid_event.offset * step_size.width) + (*step as f32 * (step_size.width + STEP_MARGIN_RIGHT)),
+                    y: CONTAINER_PADDING + (*track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)),
+                    width: step_size.width,
+                    height: step_size.height
                 };
     
                 grid_event_rect.contains(cursor)
@@ -89,17 +96,19 @@ impl GridPattern {
         }
     }
 
-    pub fn select_area(&mut self, bounds: Rectangle) {
+    pub fn select_area(&mut self, selection: Rectangle, bounds: Rectangle) {
+        let step_size = get_step_dimensions(bounds);
+
         self.data.iter_mut().for_each(|((step, track), grid_event)| {
-            let event_origin = get_event_absolute_position(*step, *track, grid_event.offset);
+            let event_origin = get_event_absolute_position(*step, *track, grid_event.offset, bounds);
             let event_bounds = Rectangle {
                 x: event_origin.x,
                 y: event_origin.y,
                 width: EVENT_WIDTH,
-                height: STEP_HEIGHT,
+                height: step_size.height,
             };
 
-            match bounds.intersection(&event_bounds) {
+            match selection.intersection(&event_bounds) {
                 Some(_) => {
                     grid_event.selected = true;
                 }
@@ -117,6 +126,15 @@ impl GridPattern {
             .map(|(grid_id, _)| grid_id)
             .collect()
     }
+
+    pub fn empty_selection(&mut self) {
+        self.data
+            .iter_mut()
+            .filter(|(_, grid_event)| grid_event.selected)
+            .for_each(|(_, grid_event)| {
+                grid_event.selected = false;
+            });
+    }
 }
 
 fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
@@ -131,29 +149,33 @@ fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
 }
 
 fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(usize, usize, f32)> {
+    let step_size = get_step_dimensions(bounds);
+    
     if bounded {
         if is_point_inside_draggable_area(cursor, bounds) {
-            let step = ((cursor.x - CONTAINER_PADDING) / (STEP_WIDTH + STEP_MARGIN_RIGHT)) as usize;
-            let track = ((cursor.y - CONTAINER_PADDING) / (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)) as usize;
-            let offset = cursor.x - (CONTAINER_PADDING + step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT));
+            let step = ((cursor.x - CONTAINER_PADDING) / (step_size.width + STEP_MARGIN_RIGHT)) as usize;
+            let track = ((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize;
+            let offset = cursor.x - (CONTAINER_PADDING + step as f32 * (step_size.width + STEP_MARGIN_RIGHT));
 
             Some((step, track, offset))
         } else {
             None
         }
     } else {
-        let step = (((cursor.x - CONTAINER_PADDING) / (STEP_WIDTH + STEP_MARGIN_RIGHT)) as usize).min(0).max(NUM_STEPS);
-        let track = (((cursor.y - CONTAINER_PADDING) / (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)) as usize).min(0).max(NUM_PERCS);
-        let offset = (cursor.x - (CONTAINER_PADDING + step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT))).min(-0.99).max(0.99);
+        let step = (((cursor.x - CONTAINER_PADDING) / (step_size.width + STEP_MARGIN_RIGHT)) as usize).min(0).max(NUM_STEPS);
+        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).min(0).max(NUM_PERCS);
+        let offset = (cursor.x - (CONTAINER_PADDING + step as f32 * (step_size.width + STEP_MARGIN_RIGHT))).min(-0.99).max(0.99);
 
         Some((step, track, offset))
     }
 }
 
-fn get_event_absolute_position(step: usize, track: usize, offset: f32) -> Point {
+fn get_event_absolute_position(step: usize, track: usize, offset: f32, bounds: Rectangle) -> Point {
+    let step_size = get_step_dimensions(bounds);
+
     return Point {
-        x: CONTAINER_PADDING + (offset * STEP_WIDTH) + step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT),
-        y: CONTAINER_PADDING + track as f32 * (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)
+        x: CONTAINER_PADDING + (offset * step_size.width) + step as f32 * (step_size.width + STEP_MARGIN_RIGHT),
+        y: CONTAINER_PADDING + track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)
     }
 }
 
@@ -181,17 +203,19 @@ fn move_selection(
         }
     };
 
+    let step_size = get_step_dimensions(bounds);
+
     // we iterate here over our source of truth , base_pattern
     // but we apply temporary changes on output_pattern
     for ((step, track), mut event) in base_pattern.data.to_owned() {
         if event.selected {
-            let event_position = get_event_absolute_position(step, track, event.offset);
+            let event_position = get_event_absolute_position(step, track, event.offset, bounds);
             let next_position = Point { x: event_position.x + drag_bounds.width , y: event_position.y + drag_bounds.height };
             let next_step = get_hovered_step(next_position, bounds, false).unwrap();
     
             // cast y position to new track usize
             // WARNING : ther's a possibility of direction mistake here
-            let track_offset: isize = (drag_bounds.height / (STEP_HEIGHT + TRACK_MARGIN_BOTTOM)) as isize;
+            let track_offset: isize = (drag_bounds.height / (step_size.height + TRACK_MARGIN_BOTTOM)) as isize;
             let next_track = ((track as isize + track_offset) % NUM_PERCS as isize) as usize;
 
             // we move in quantized fashion only when whantized mode on 
@@ -199,8 +223,8 @@ fn move_selection(
 
             // next step event, if there is any
             // let next_step_event = base_pattern.data.get();
-            let same_step_offset_left = (STEP_WIDTH + STEP_MARGIN_RIGHT) * origin_event.offset;
-            let same_step_offset_right = (STEP_WIDTH + STEP_MARGIN_RIGHT) - origin_event.offset * (STEP_WIDTH + STEP_MARGIN_RIGHT);
+            let same_step_offset_left = (step_size.width + STEP_MARGIN_RIGHT) * origin_event.offset;
+            let same_step_offset_right = (step_size.width + STEP_MARGIN_RIGHT) - origin_event.offset * (step_size.width + STEP_MARGIN_RIGHT);
 
             // if we are quantized and drag width is superior to the bounds of the original selected event
             if quantized && (drag_bounds.width > same_step_offset_right) | (drag_bounds.width < (-1.0 * same_step_offset_left)) {
@@ -375,6 +399,8 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 hovered_step,
                 hovered_event_change
             ) => {
+                let step_size = get_step_dimensions(bounds);
+
                 if self.state.is_logo_pressed {
                     // velocity mode
                 } else {
@@ -397,7 +423,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                                         // get underlying step position, there is still a risk to have none (container padding)
                                         // offset = cursor x offset whithin that step 
                                         // velocity max = 3 * the step height plus the track margin
-                                        let drag_height_max = 3.0 * (STEP_HEIGHT + TRACK_MARGIN_BOTTOM);
+                                        let drag_height_max = 3.0 * (step_size.height + TRACK_MARGIN_BOTTOM);
                                         let mut grid_event = GridEvent {
                                             offset: 0.0,
                                             velocity: 1.0 - (drag_bounds.height.max(drag_height_max) / drag_height_max),
@@ -419,9 +445,6 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                                                         self.state.base_pattern.data.insert((step, track), grid_event);
                                                     }
                                                 }
-
-                                                // Add created event to selection
-                                                self.state.selection.data.insert((step, track), grid_event);
                                             }
                                             None => {}
                                         }
@@ -438,7 +461,8 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                                 match origin_hovered_event {
                                     // we can only drag if origin of dragging is hovering an event
                                     Some((grid_id, grid_event)) => {
-                                        if !self.state.selection.data.is_empty() {
+                                        // TODO double check if we should check that on output_patern or base_pattern
+                                        if !self.state.output_pattern.get_selection().is_empty() {
                                             let quantize = self.state.modifiers.logo;
                                             let duplicate = self.state.modifiers.alt;
 
@@ -471,7 +495,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 }
             }
             Actions::DoubleClick(cursor) => {
-                match self.state.base_pattern.to_owned().get_hovered(cursor) {
+                match self.state.base_pattern.to_owned().get_hovered(cursor, bounds) {
                     Some((grid_id, _grid_event)) => {
                         // remove event
                         self.state.base_pattern.data.remove(&grid_id);
@@ -491,7 +515,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 self.state.output_pattern = self.state.base_pattern.clone();
             }
             Actions::Click(cursor) => {
-                match self.state.base_pattern.to_owned().get_hovered(cursor) {
+                match self.state.base_pattern.to_owned().get_hovered(cursor, bounds) {
                     Some((grid_id, _)) => {
                         self.state.base_pattern.to_owned().select(grid_id, self.state.modifiers);
                         self.state.output_pattern.to_owned().select(grid_id, self.state.modifiers);
@@ -574,7 +598,6 @@ pub enum DrawMode {
 pub struct State {
     base_pattern: GridPattern,
     output_pattern: GridPattern,
-    selection: GridPattern,
     draw_mode: DrawMode,
     is_dragging: bool,
     is_logo_pressed: bool,
@@ -601,7 +624,6 @@ impl State {
         Self {
             base_pattern: base_pattern.clone(),
             output_pattern: base_pattern.clone(),
-            selection: GridPattern::new(),
             draw_mode: DrawMode::Pen,
             is_dragging: false,
             is_logo_pressed: false,
@@ -614,9 +636,10 @@ impl State {
     }
 
     pub fn reset_selection(&mut self) {
-        self.selection = GridPattern::new();
         self.selection_rectangle = None;
         self.is_logo_pressed = false;
+        self.output_pattern.empty_selection();
+        self.base_pattern.empty_selection();
     }
 
     pub fn reset_dragging_state(&mut self) {
@@ -675,17 +698,17 @@ where
                             // origin x cursor position, we check if it holds an event or not
                             let origin_hovered_event = self.state.output_pattern
                                 .to_owned()
-                                .get_hovered(self.state.drag_origin);
+                                .get_hovered(self.state.drag_origin, bounds);
 
                             // previous x cursor position, we check if it holds an event or not
                             let prev_hovered_event = self.state.output_pattern
                                 .to_owned()
-                                .get_hovered(self.state.last_drag_position);
+                                .get_hovered(self.state.last_drag_position, bounds);
 
                             // current x cursor position, we check if it holds an event or not
                             let hovered_event = self.state.output_pattern
                                 .to_owned()
-                                .get_hovered(cursor_position);
+                                .get_hovered(cursor_position, bounds);
 
                             // get unbounded cursor step hover
                             let hovered_step = get_hovered_step(cursor_position, bounds, false);   
