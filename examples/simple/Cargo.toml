@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 iced = "0.2"
 iced_sequencing = { path = "../../" }
+ganic-no-std = { path = "../../../ganic_rs-workspace/ganic-no-std" }

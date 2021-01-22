@@ -3,7 +3,7 @@ use iced_graphics::{Backend, Primitive, Renderer};
 use iced_native::{mouse, Background, Point, Rectangle, Color, Size, Vector};
 
 pub use crate::native::grid::{
-    State, DrawMode, STEP_HEIGHT, STEP_WIDTH, STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM, CONTAINER_PADDING
+    State, DrawMode, get_step_dimensions, STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM, CONTAINER_PADDING
 };
 pub use crate::style::grid::{Style, StyleSheet};
 
@@ -23,6 +23,8 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         style_sheet: &Self::Style
     ) -> Self::Output {
         let is_mouse_over = bounds.contains(cursor_position);
+        let step_size = get_step_dimensions(bounds);
+
 
         // let style = if is_dragging {
         //     style_sheet.dragging()
@@ -38,7 +40,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         // let bounds_width = bounds.width.floor();
         // let bounds_height = bounds.height.floor();
 
-        let grid = draw_grid(bounds);
+        let grid = draw_grid(bounds, step_size);
       
 
         (
@@ -50,7 +52,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
     }
 }
 
-fn draw_grid(bounds: Rectangle) -> Vec<Primitive> {
+fn draw_grid(bounds: Rectangle, step_size: Size) -> Vec<Primitive> {
     let background = Primitive::Quad {
         bounds,
         background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.5)),
@@ -64,15 +66,15 @@ fn draw_grid(bounds: Rectangle) -> Vec<Primitive> {
     // now render grid
     for step in 0..NUM_STEPS {
         for track in 0..NUM_PERCS {
-            let step_offset_x = CONTAINER_PADDING + (step as f32 * (STEP_WIDTH + STEP_MARGIN_RIGHT));
-            let step_offset_y = CONTAINER_PADDING + (track as f32 * (STEP_HEIGHT + TRACK_MARGIN_BOTTOM));
+            let step_offset_x = CONTAINER_PADDING + (step as f32 * step_size.width);
+            let step_offset_y = CONTAINER_PADDING + (track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM));
 
             primitives.push(Primitive::Quad {
                 bounds: Rectangle{
                     x: step_offset_x,
                     y: step_offset_y,
-                    width: STEP_WIDTH,
-                    height: STEP_HEIGHT
+                    width: step_size.width - STEP_MARGIN_RIGHT,
+                    height: step_size.height
                 },
                 background: Background::Color(Color::from_rgba(0.5, 0.5, 0.5, 0.5)),
                 border_radius: 0.0,

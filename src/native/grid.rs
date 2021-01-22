@@ -16,9 +16,9 @@ pub const EVENT_WIDTH: f32 = 30.0;
 pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.15;
 
-fn get_step_dimensions(bounds: Rectangle) -> Size {
+pub fn get_step_dimensions(bounds: Rectangle) -> Size {
     return Size {
-        width: ((bounds.width - (2.0 * CONTAINER_PADDING)) / NUM_STEPS as f32) - STEP_MARGIN_RIGHT,
+        width: (bounds.width - (2.0 * CONTAINER_PADDING)) / NUM_STEPS as f32,
         height: ((bounds.height - (2.0 * CONTAINER_PADDING)) / NUM_PERCS as f32) - TRACK_MARGIN_BOTTOM
     }    
 }
@@ -190,29 +190,22 @@ fn move_selection(
     origin_event: GridEvent,
     quantized: bool,
     duplicate: bool,
-    base_pattern: GridPattern,
-    output_pattern: GridPattern) -> GridPattern {
+    base_pattern: GridPattern) -> HashMap<(usize, usize), GridEvent> {
 
-    let mut output_data_clone = base_pattern.data.clone();
-
-    let x_axis_drag_direction = {
-        if drag_bounds.width < 0.0 {
-            Direction::Negative
-        } else {
-            Direction::Positive
-        }
-    };
+    let mut output: HashMap<(usize, usize), GridEvent>  = base_pattern.data.clone();
 
     let step_size = get_step_dimensions(bounds);
 
     // we iterate here over our source of truth , base_pattern
     // but we apply temporary changes on output_pattern
-    for ((step, track), mut event) in base_pattern.data.to_owned() {
+    for ((step, track), event) in base_pattern.data.to_owned() {
         if event.selected {
             let event_position = get_event_absolute_position(step, track, event.offset, bounds);
-            let next_position = Point { x: event_position.x + drag_bounds.width , y: event_position.y + drag_bounds.height };
-            let next_step = get_hovered_step(next_position, bounds, false).unwrap();
-    
+            let next_event_position = Point { x: event_position.x + drag_bounds.width , y: event_position.y + drag_bounds.height };
+            
+            // with unbounded flag we must get smthg back
+            let cursor_step = get_hovered_step(next_event_position, bounds, false).unwrap();
+
             // cast y position to new track usize
             // WARNING : ther's a possibility of direction mistake here
             let track_offset: isize = (drag_bounds.height / (step_size.height + TRACK_MARGIN_BOTTOM)) as isize;
@@ -227,27 +220,30 @@ fn move_selection(
             let same_step_offset_right = (step_size.width + STEP_MARGIN_RIGHT) - origin_event.offset * (step_size.width + STEP_MARGIN_RIGHT);
 
             // if we are quantized and drag width is superior to the bounds of the original selected event
-            if quantized && (drag_bounds.width > same_step_offset_right) | (drag_bounds.width < (-1.0 * same_step_offset_left)) {
-                if (step != next_step.0) | (track != next_track) {
-                    match output_data_clone.get_mut(&(step, track)) {
-                        Some(event_to_process) => {
+            match output.get(&(step, track)) {
+                Some(&event_to_process) => {
+                    if quantized && (drag_bounds.width > same_step_offset_right) | (drag_bounds.width < (-1.0 * same_step_offset_left)) {
+                        if (step != cursor_step.0) | (track != next_track) {
                             if duplicate {
-                                event_to_process.selected = false;
+                                // select event
+                                let original_event = output.get_mut(&(step, track)).unwrap();
+                                original_event.selected = true
+
                             } else {
-                                output_data_clone.remove(&(step, track));
+                                output.remove(&(step, track));
                             }
 
-                            match output_data_clone.get(&(next_step.0, next_track)) {
+                            match base_pattern.data.get(&(cursor_step.0, next_track)) {
                                 Some(_) => {
-                                    output_data_clone.remove(&(next_step.0, next_track));
-                                    output_data_clone.insert((next_step.0, next_track), GridEvent {
+                                    output.remove(&(cursor_step.0, next_track));
+                                    output.insert((cursor_step.0, next_track), GridEvent {
                                         offset: event_to_process.offset,
                                         velocity: event_to_process.velocity,
                                         selected: true
                                     });
                                 }
                                 None => {
-                                    output_data_clone.insert((next_step.0, next_track), GridEvent {
+                                    output.insert((cursor_step.0, next_track), GridEvent {
                                         offset: event_to_process.offset,
                                         velocity: event_to_process.velocity,
                                         selected: true
@@ -255,59 +251,134 @@ fn move_selection(
                                 }
                             }
                         }
-                        None => {}
+                    } else {
+                        // unquantized mess ...
+                        // we have few difficult cases:
+                        // - if the next step holds an event with negative offset
+                        // - if the previous step has an event , keep event on same step with negative offset, till it collides with offset of previous event
+                        // - main rule : only used positive offset unless there is already an event on the same step
+                        // - Duplicates : on small values , we will start with negative offsets on next step if we move to the right,
+                        //   and juste move selection if we move to the left ... phew 
+                        
+                        let hovered_event = base_pattern.data.get(&(cursor_step.0, next_track));
+                        let next_track_event = base_pattern.data.get(&(cursor_step.0 + 1, next_track));
+        
+                        if duplicate {
+                            // select event
+                            let original_event = output.get_mut(&(step, track)).unwrap();
+                            original_event.selected = true
+                        }
+
+                        match hovered_event {
+                            Some(hovered_grid_event) => {
+                                if (step != cursor_step.0) | (track != next_track) {
+                                    output.remove(&(step, track));
+                                }
+
+                                match next_track_event {
+                                    Some(next_track_grid_event) => {
+                                        // event hovered by the current moved step and event on next step same track
+                                        // we have to remove the current one if next event offset is not colliding
+                                        // otherwise we keep current one 
+                                        if next_track_grid_event.offset < 0.0 && cursor_step.2 >= (1.0 + next_track_grid_event.offset - OFFSET_THRESHOLD)  {
+                                            // TODO : could we mutate instead ? 
+                                            output.remove(&(cursor_step.0 + 1, next_track));
+                                            output.insert((cursor_step.0 + 1, next_track), GridEvent {
+                                                offset: cursor_step.2 - 1.0,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        } else {
+                                            // TODO : could we mutate instead ? 
+                                            output.remove(&(cursor_step.0, next_track));
+                                            output.insert((cursor_step.0, next_track), GridEvent {
+                                                offset: cursor_step.2,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        }
+                                    }
+                                    None => {
+                                        if cursor_step.2 <= hovered_grid_event.offset + OFFSET_THRESHOLD {
+                                            output.remove(&(cursor_step.0, next_track));
+
+                                            if cursor_step.2 <= 0.5 {
+                                                output.insert((cursor_step.0, next_track), GridEvent {
+                                                    offset: cursor_step.2,
+                                                    velocity: event_to_process.velocity,
+                                                    selected: true
+                                                });
+                                            } else {
+                                                output.insert((cursor_step.0 + 1, next_track), GridEvent {
+                                                    offset: cursor_step.2 - 1.0,
+                                                    velocity: event_to_process.velocity,
+                                                    selected: true
+                                                });
+                                            }
+                                            
+                                        } else {
+                                            output.insert((cursor_step.0 + 1, next_track), GridEvent {
+                                                offset: cursor_step.2 - 1.0,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            None => {
+                                if !duplicate {
+                                    output.remove(&(step, track));
+                                }
+
+                                match next_track_event {
+                                    Some(next_track_grid_event) => {
+                                        // no event hovered by the current moved step but event on next step same track
+                                        // i.e we need to check if next event as a negative offset 
+                                        // if yes and it collides with calculated new offset, remove next step event
+                                        if next_track_grid_event.offset < 0.0 && cursor_step.2 >= (1.0 + next_track_grid_event.offset - OFFSET_THRESHOLD)  {
+                                            output.remove(&(cursor_step.0 + 1, next_track));
+                                            output.insert((cursor_step.0 + 1, next_track), GridEvent {
+                                                offset: cursor_step.2 - 1.0,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        } else {
+                                            output.insert((cursor_step.0, next_track), GridEvent {
+                                                offset: cursor_step.2,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        }
+                                    }
+                                    None => {
+                                        // no event hovered by the current moved step and no event on next step same track
+                                        // i.e we must have dragged the event to a new step
+                                        if cursor_step.2 <= 0.5 {
+                                            output.insert((cursor_step.0, next_track), GridEvent {
+                                                offset: cursor_step.2,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        } else {
+                                            output.insert((cursor_step.0 + 1, next_track), GridEvent {
+                                                offset: cursor_step.2 - 1.0,
+                                                velocity: event_to_process.velocity,
+                                                selected: true
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            } else {
-                // unquantized mess ...
-                // we have few difficult cases:
-                // - if the next step holds an event with negative offset
-                // - if the previous step has an event , keep event on same step with negative offset, till it collides with offset of previous event
-                // - main rule : only used positive offset unless there is already an event on the same step
-                // - Duplicates : on small values , we will start with negative offsets on next step if we move to the right,
-                //   and juste move selection if we move to the left ... phew 
-                
-                
-
-
+                None => {}
             }
-            
-
-            // if !quantized {
-            //     event.offset = next_step.2;
-            // }
-    
-            // if (step != next_step.0) | (track != next_track) {
-    
-            //     // output
-            //     output_data_clone.remove(&(step, track));
-            //     output_data_clone.insert((next_step.0, next_track), event);
-            // } else if !quantized {
-            //     // selection
-            //     let editable_event_from_selection = selection_data_clone.get_mut(&(step, track));
-    
-            //     match editable_event_from_selection {
-            //         Some(event_to_mut) => {
-            //             event_to_mut.offset = next_event.2
-            //         }
-            //         None => {}
-            //     }
-    
-            //     // output
-            //     let editable_event_from_output = output_data_clone.get_mut(&(step, track));
-    
-            //     match editable_event_from_output {
-            //         Some(event_to_mut) => {
-            //             event_to_mut.offset = next_event.2
-            //         }
-            //         None => {}
-            //     }
-            // }
         }
     }
 
-    selection.data = selection_data_clone.clone();
-    output_pattern.data = output_data_clone.clone();
+    return output.to_owned();
 }
 
 impl From<Pattern> for GridPattern {
@@ -330,6 +401,9 @@ impl From<GridPattern> for Pattern {
     fn from(grid: GridPattern) -> Self {
         let mut pattern = Pattern::new();
 
+        println!("{:?}", grid.data);
+
+
         for ((step, track), event) in grid.data {
             pattern.data[step][track][0] = event.velocity;
             pattern.data[step][track][1] = event.offset;
@@ -341,7 +415,7 @@ impl From<GridPattern> for Pattern {
 
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
     state: &'a mut State,
-    on_change: Box<dyn Fn() -> Message>,
+    on_change: Box<dyn Fn(Pattern) -> Message>,
     width: Length,
     height: Length,
     style: Renderer::Style
@@ -355,7 +429,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         height: Length
     ) -> Self
     where
-        F: 'static + Fn() -> Message,
+        F: 'static + Fn(Pattern) -> Message,
     {
         Grid {
             state,
@@ -387,22 +461,35 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     }
 
     pub fn on_action(&mut self, action: Actions, bounds: Rectangle) {
+
+        println!("{:?}", action);
+
         match action {
             Actions::Drag(
                 cursor,
-                is_cursor_inside_draggable_area,
+                // is_cursor_inside_draggable_area,
                 is_origin_inside_draggable_area,
                 drag_bounds,
                 origin_hovered_event,
-                prev_hovered_event,
+                // prev_hovered_event,
                 hovered_event,
-                hovered_step,
+                // hovered_step,
                 hovered_event_change
             ) => {
                 let step_size = get_step_dimensions(bounds);
 
                 if self.state.is_logo_pressed {
                     // velocity mode
+                    let drag_height_max = 3.0 * (step_size.height + TRACK_MARGIN_BOTTOM);
+                    let velocity = 1.0 - (drag_bounds.height.max(drag_height_max) / drag_height_max);
+
+                    self.state.output_pattern.data
+                        .iter_mut()
+                        .filter(|grid_event| grid_event.1.selected)
+                        .for_each(|grid_event| {
+                            grid_event.1.velocity = velocity;
+                        });
+
                 } else {
                     match self.state.draw_mode {
                         DrawMode::Pen => {
@@ -460,20 +547,21 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                             if is_origin_inside_draggable_area {
                                 match origin_hovered_event {
                                     // we can only drag if origin of dragging is hovering an event
-                                    Some((grid_id, grid_event)) => {
+                                    Some((_, grid_event)) => {
                                         // TODO double check if we should check that on output_patern or base_pattern
-                                        if !self.state.output_pattern.get_selection().is_empty() {
+                                                                                
+                                        if !self.state.output_pattern.to_owned().get_selection().is_empty() {
                                             let quantize = self.state.modifiers.logo;
                                             let duplicate = self.state.modifiers.alt;
 
-                                            move_selection(
+                                            // replace output pattern with new generated one with moving rules
+                                            self.state.output_pattern.data = move_selection(
                                                 drag_bounds,
                                                 bounds,
                                                 grid_event,
                                                 quantize,
                                                 duplicate,
-                                                self.state.base_pattern,
-                                                self.state.output_pattern
+                                                self.state.base_pattern.to_owned()
                                             );
 
                                         } else {
@@ -515,6 +603,9 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 self.state.output_pattern = self.state.base_pattern.clone();
             }
             Actions::Click(cursor) => {
+
+                println!("Action click {:?}", self.state.base_pattern);
+
                 match self.state.base_pattern.to_owned().get_hovered(cursor, bounds) {
                     Some((grid_id, _)) => {
                         self.state.base_pattern.to_owned().select(grid_id, self.state.modifiers);
@@ -571,16 +662,14 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 * - selection + modifier key Esc or Del => reset state (empty) => Delete Selection
 */
 
+#[derive(Debug)]
 pub enum Actions {
     Drag(
         Point,
         bool,
-        bool,
         Rectangle,
         Option<((usize, usize), GridEvent)>,
         Option<((usize, usize), GridEvent)>,
-        Option<((usize, usize), GridEvent)>,
-        Option<(usize, usize, f32)>,
         (bool, bool)
     ),
     DoubleClick(Point),
@@ -678,7 +767,7 @@ where
         event: Event,
         layout: Layout<'_>,
         cursor_position: Point,
-        _messages: &mut Vec<Message>,
+        messages: &mut Vec<Message>,
         _renderer: &Renderer,
         _clipboard: Option<&dyn Clipboard>,
     ) -> event::Status {
@@ -690,7 +779,9 @@ where
                     if self.state.is_dragging {
                         let bounds_height = layout.bounds().height;
 
-                        if bounds_height > 0.0 {
+                        if  bounds_height > 0.0 
+                            && cursor_position.x - self.state.drag_origin.x > 0.01
+                            && cursor_position.y - self.state.drag_origin.y > 0.01 {
 
                             // we'll use that to default Option results with map_or
                             let none_value: usize = 1000;
@@ -711,7 +802,7 @@ where
                                 .get_hovered(cursor_position, bounds);
 
                             // get unbounded cursor step hover
-                            let hovered_step = get_hovered_step(cursor_position, bounds, false);   
+                            // let hovered_step = get_hovered_step(cursor_position, bounds, false);   
                                 
                             // let's just extract the (step, track) to compare them
                             // (we cannot have two events on the same step, so they must either be different or the same one)
@@ -729,19 +820,21 @@ where
                             };
 
                             let is_origin_inside_draggable_area = is_point_inside_draggable_area(self.state.drag_origin, bounds);
-                            let is_cursor_inside_draggable_area = is_point_inside_draggable_area(self.state.drag_origin, bounds);
+                            // let is_cursor_inside_draggable_area = is_point_inside_draggable_area(self.state.drag_origin, bounds);
 
                             self.on_action(Actions::Drag(
                                 cursor_position,
-                                is_cursor_inside_draggable_area,
+                                // is_cursor_inside_draggable_area,
                                 is_origin_inside_draggable_area,
                                 drag_bounds,
                                 origin_hovered_event,
-                                prev_hovered_event,
+                                // prev_hovered_event,
                                 hovered_event,
-                                hovered_step,
+                                // hovered_step,
                                 hovered_event_change
                             ), bounds);
+
+                            messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
 
                             return event::Status::Captured;
                         }
@@ -773,6 +866,8 @@ where
 
                         self.state.last_click = Some(click);
 
+                        messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
+
                         return event::Status::Captured;
                     }
                 }
@@ -781,6 +876,8 @@ where
 
                     // commit ouput pattern changes to base_patern
                     self.state.base_pattern.data = self.state.output_pattern.data.clone();
+
+                    messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
 
                     return event::Status::Captured;
                 }
@@ -800,6 +897,8 @@ where
 
                     self.on_action(Actions::KeyAction(key_code), bounds);
 
+                    messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
+
                     return event::Status::Captured;
                 }
                 keyboard::Event::KeyReleased { modifiers, .. } => {
@@ -808,6 +907,8 @@ where
                     // reset velocity mode
                     if !self.state.modifiers.logo {
                         self.state.is_logo_pressed = false;
+
+                        messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
                     }
 
                     return event::Status::Captured;

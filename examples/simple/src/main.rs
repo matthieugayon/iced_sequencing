@@ -3,11 +3,12 @@ use iced::{
     Align, Column, Container, Element, Length, Sandbox, Settings, Text,
 };
 // Import iced_audio modules.
-use iced_sequencing::{grid};
+use iced_sequencing::grid;
+use ganic_no_std::pattern::Pattern;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Grid()
+    NewPattern(Pattern)
 }
 
 pub fn main() {
@@ -15,7 +16,8 @@ pub fn main() {
 }
 
 pub struct App {
-    grid_state: grid::State
+    grid_state: grid::State,
+    output_text: String
 }
 
 impl Sandbox for App {
@@ -23,7 +25,8 @@ impl Sandbox for App {
 
     fn new() -> App {
         App {
-            grid_state: grid::State::new()
+            grid_state: grid::State::new(None),
+            output_text: "Edit the grid!".into(),
         }
     }
 
@@ -33,47 +36,34 @@ impl Sandbox for App {
 
     fn update(&mut self, event: Message) {
         match event {
-            // Retrieve the value by mapping the normalized value of the parameter
-            // to the corresponding range.
-            //
-            // Now do something useful with that value!
-            Message::HSliderInt(normal) => {
-                // Integer parameters must be snapped to make the widget "step" when moved.
-                self.h_slider_state.snap_visible_to(&self.int_range);
-
-                let value = self.int_range.unmap_to_value(normal);
-                self.output_text = format!("HSliderInt: {}", value);
-            }
-            Message::VSliderDB(normal) => {
-                let value = self.db_range.unmap_to_value(normal);
-                self.output_text = format!("VSliderDB: {:.3}", value);
-            }
-            Message::KnobFreq(normal) => {
-                let value = self.freq_range.unmap_to_value(normal);
-                self.output_text = format!("KnobFreq: {:.2}", value);
-            }
-            Message::XYPadFloat(normal_x, normal_y) => {
-                let value_x = self.float_range.unmap_to_value(normal_x);
-                let value_y = self.float_range.unmap_to_value(normal_y);
-                self.output_text =
-                    format!("XYPadFloat: x: {:.2}, y: {:.2}", value_x, value_y);
+            Message::NewPattern(pattern) => {
+                // self.output_text = format!("new pattern: {}", pattern.data);
+                // println!("{:?}", pattern.data);
             }
         }
     }
 
     fn view(&mut self) -> Element<Message> {
-        let grid_widget = Grid::new(&mut self.grid_state, Message::HSliderInt)
+        let grid_widget = grid::Grid::new(
+            &mut self.grid_state, 
+            Message::NewPattern,
+            Length::Units(1000),
+            Length::Units(400)
+        );
 
         let content: Element<_> = Column::new()
+            .spacing(20)
+            .padding(20)
+            .max_width(1000)
             .align_items(Align::Center)
             .push(grid_widget)
+            .push(Text::new(&self.output_text))
             .into();
 
         Container::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
-            .center_y()
             .into()
     }
 }
