@@ -1,6 +1,7 @@
 pub mod graphics;
 pub mod native;
 pub mod style;
+pub mod core;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod platform {
