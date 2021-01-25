@@ -56,14 +56,14 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
             Some(normalized_area) => {
                 let selection_area = Primitive::Quad {
                     bounds: Rectangle {
-                        x: normalized_area.x + bounds.x,
-                        y: normalized_area.y + bounds.y,
-                        width: normalized_area.width,
-                        height: normalized_area.height
+                        x: (normalized_area.x + bounds.x).ceil(),
+                        y: (normalized_area.y + bounds.y).ceil(),
+                        width: (normalized_area.width).ceil(),
+                        height: (normalized_area.height).ceil()
                     },
                     background: Background::Color(Color::TRANSPARENT),
                     border_radius: 0.0,
-                    border_width: 0.5,
+                    border_width: 1.0,
                     border_color: Color::from_rgba(0.0, 0.0, 0.0, 1.0),
                 };
 

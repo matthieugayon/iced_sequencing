@@ -42,21 +42,23 @@ use crate::core::grid::{
 
 fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(usize, usize, f32)> {
     let step_size = get_step_dimensions(bounds);
+
+    println!("get_hovered_step {:?}", step_size);
     
     if bounded {
         if is_point_inside_draggable_area(cursor, bounds) {
             let step = ((cursor.x - CONTAINER_PADDING) / step_size.width) as usize;
             let track = ((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize;
-            let offset = cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width);
+            let offset = (cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)) / step_size.width;
 
             Some((step, track, offset))
         } else {
             None
         }
     } else {
-        let step = (((cursor.x - CONTAINER_PADDING) / step_size.width) as usize).min(0).max(NUM_STEPS);
-        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).min(0).max(NUM_PERCS);
-        let offset = (cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)).min(-0.99).max(0.99);
+        let step = (((cursor.x - CONTAINER_PADDING) / step_size.width) as usize).max(0).min(NUM_STEPS);
+        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS);
+        let offset = ((cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)) / step_size.width).max(-0.99).min(0.99);
 
         Some((step, track, offset))
     }
@@ -74,33 +76,67 @@ fn move_selection(
 
     let step_size = get_step_dimensions(normalized_bounds);
 
+    // TESTS 
+    // let origin_offset_left = step_size.width * origin_event.offset;
+    // let origin_offset_right = step_size.width - same_step_offset_left;
+
+    // let drag_step = {
+    //     if drag_bounds.width > origin_offset_right {
+
+    //         let further_step_offset = (drag_bounds.width - origin_offset_right) % (step_size.width * 0.5);
+    //         further_step_offset + 1;
+    //     } 
+
+    //     2
+    // };
+
+
+
+    println!("---------------  move_selection {:?} ---------------", quantized);
+
     // we iterate here over our source of truth , base_pattern
     // but we apply temporary changes on output_pattern
     for ((step, track), event) in base_pattern.data.to_owned() {
         if event.selected {
             let event_position = get_event_absolute_position(step, track, event.offset, normalized_bounds);
             let next_event_position = Point { x: event_position.x + drag_bounds.width , y: event_position.y + drag_bounds.height };
+
+            println!("---------------");
+            println!("(step {:?}, track {:?})", step, track);
+            println!("event_position {:?}", event_position);
+            println!("next_event_position {:?}", next_event_position);
+            println!("normalized_bounds {:?}", normalized_bounds);
             
             // with unbounded flag we must get smthg back
             let cursor_step = get_hovered_step(next_event_position, normalized_bounds, false).unwrap();
 
             // cast y position to new track usize
             // WARNING : ther's a possibility of direction mistake here
-            let track_offset: isize = (drag_bounds.height / (step_size.height + TRACK_MARGIN_BOTTOM)) as isize;
-            let next_track = ((track as isize + track_offset) % NUM_PERCS as isize) as usize;
+            let track_offset: isize = ((drag_bounds.height / (step_size.height + TRACK_MARGIN_BOTTOM)) as isize)
+                .max(-(NUM_PERCS as isize)).min(NUM_PERCS as isize);
+            let next_track = ((track as isize + track_offset) as usize) % NUM_PERCS;
+
+            println!("cursor_step {:?}", cursor_step);
+            println!("track_offset {:?}", track_offset);
+            println!("next track {:?}", next_track);
 
             // we move in quantized fashion only when whantized mode on 
             // and dragging width is superior to STEP_WIDTH + STEP_MARGIN_RIGHT
 
             // next step event, if there is any
             // let next_step_event = base_pattern.data.get();
-            let same_step_offset_left = (step_size.width + STEP_MARGIN_RIGHT) * origin_event.offset;
-            let same_step_offset_right = (step_size.width + STEP_MARGIN_RIGHT) - origin_event.offset * (step_size.width + STEP_MARGIN_RIGHT);
+            let same_step_offset_left = step_size.width * origin_event.offset;
+            let same_step_offset_right = step_size.width - same_step_offset_left;
+
+            println!("origin_event {:?}", origin_event);
+            println!("same_step_offset_left {:?}", same_step_offset_left);
+            println!("drag_bounds {:?}", drag_bounds);
+
 
             // if we are quantized and drag width is superior to the bounds of the original selected event
             match output.get(&(step, track)) {
                 Some(&event_to_process) => {
-                    if quantized && (drag_bounds.width > same_step_offset_right) | (drag_bounds.width < (-1.0 * same_step_offset_left)) {
+                    if quantized {
                         if (step != cursor_step.0) | (track != next_track) {
                             if duplicate {
                                 // select event
@@ -177,8 +213,9 @@ fn move_selection(
                                         }
                                     }
                                     None => {
+                                        output.remove(&(cursor_step.0, next_track));
+
                                         if cursor_step.2 <= hovered_grid_event.offset + OFFSET_THRESHOLD {
-                                            output.remove(&(cursor_step.0, next_track));
 
                                             if cursor_step.2 <= 0.5 {
                                                 output.insert((cursor_step.0, next_track), GridEvent {
@@ -302,14 +339,22 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self
     }
 
-    pub fn create_selection_area(&mut self, bounds: Rectangle) {
-        self.state.selection_rectangle = Some(bounds);
+    pub fn create_selection_area(&mut self, selection: Rectangle, bounds: Rectangle) {
+        let selection_rectangle = Rectangle {
+            x: if selection.width < 0.0 { selection.x + selection.width } else { selection.x },
+            y: if selection.height < 0.0 { selection.y + selection.height } else { selection.y },
+            width: if selection.width < 0.0 { -selection.width } else { selection.width },
+            height: if selection.height < 0.0 { -selection.height } else { selection.height }
+        };
 
+        self.state.selection_rectangle = Some(selection_rectangle);
+        self.state.base_pattern.select_area(selection_rectangle, bounds);
+        self.state.output_pattern = self.state.base_pattern.clone();
     }
 
     pub fn on_action(&mut self, action: Actions, bounds: Rectangle) {
 
-        println!("{:?}", action);
+        // println!("{:?}", action);
 
         match action {
             Actions::Drag(
@@ -326,9 +371,12 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 let step_size = get_step_dimensions(bounds);
 
                 if self.state.is_logo_pressed {
+
                     // velocity mode
                     let drag_height_max = 3.0 * (step_size.height + TRACK_MARGIN_BOTTOM);
                     let velocity = 1.0 - (drag_bounds.height.max(drag_height_max) / drag_height_max);
+
+                    println!("dragging with Velocity mode {:?}", velocity);
 
                     self.state.output_pattern.data
                         .iter_mut()
@@ -340,12 +388,16 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 } else {
                     match self.state.draw_mode {
                         DrawMode::Pen => {
+
+                            println!("dragging with DrawMode::Pen {:?}", hovered_event_change);
                             // For your information : we only draw on the same track / x axis
                             // we use the y axis for the velocity
                             // if it's the first drag position we're treating 
                             // or if the current hovered event is not the equal to the previous one
                             // => so the current hovered event is an event not having been drawn by the current dragging session
                             if (self.state.last_drag_position == cursor) | hovered_event_change.0 {
+
+                                println!("DrawMode::Pen hivered event {:?}", hovered_event);
 
                                 match hovered_event {
                                     // if an event is currently hovered, remove it
@@ -391,14 +443,20 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                             }
                         }
                         DrawMode::Cursor => {
+                            // println!("dragging with DrawMode::Cursor  {:?}", is_origin_inside_draggable_area);
+
                             if is_origin_inside_draggable_area {
+
+                                //println!("DrawMode::Cursor  origin_hovered_event {:?}", origin_hovered_event);
+
+
                                 match origin_hovered_event {
                                     // we can only drag if origin of dragging is hovering an event
                                     Some((_, grid_event)) => {
                                         // TODO double check if we should check that on output_patern or base_pattern
                                                                                 
-                                        if !self.state.output_pattern.to_owned().get_selection().is_empty() {
-                                            let quantize = self.state.modifiers.logo;
+                                        if !self.state.base_pattern.to_owned().get_selection().is_empty() {
+                                            let quantize = !self.state.modifiers.logo;
                                             let duplicate = self.state.modifiers.alt;
 
                                             // replace output pattern with new generated one with moving rules
@@ -413,17 +471,17 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 
                                         } else {
                                             // draw selection and add grid events to selection
-                                            self.create_selection_area(drag_bounds);
+                                            self.create_selection_area(drag_bounds, bounds);
                                         }        
                                     }
                                     None => {
                                         // draw selection and add grid events to selection
-                                        self.create_selection_area(drag_bounds);
+                                        self.create_selection_area(drag_bounds, bounds);
                                     }
                                 }
                             } else {
                                 // draw selection and add grid events to selection
-                                self.create_selection_area(drag_bounds);
+                                self.create_selection_area(drag_bounds, bounds);
                             }   
                         }
                     }
@@ -455,21 +513,52 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 
                 match self.state.base_pattern.to_owned().get_hovered(cursor, bounds) {
                     Some((grid_id, _)) => {
-                        self.state.base_pattern.to_owned().select(grid_id, self.state.modifiers);
-                        self.state.output_pattern.to_owned().select(grid_id, self.state.modifiers);
+                        self.state.base_pattern.select(grid_id, self.state.modifiers);
+                        self.state.last_selected_event_id = Some(grid_id)
                     }
-                    _ => {}
+                    _ => {
+                        self.state.last_selected_event_id = None;
+                        self.state.base_pattern.empty_selection();
+                    }
+                }
+
+                // replicate base pattern to output pattern
+                self.state.output_pattern = self.state.base_pattern.clone();
+            }
+            Actions::ClickRelease => {
+                match self.state.last_selected_event_id {
+                    Some(grid_id) => {
+                        self.state.base_pattern.select_one(grid_id, self.state.modifiers);
+                        // replicate base pattern to output pattern
+                        self.state.output_pattern = self.state.base_pattern.clone();
+                    }
+                    None => {}
                 }
             }
             Actions::KeyAction(key_code) => {
+                println!("Actions::KeyAction {:?}", key_code);
+
                 match key_code {
-                    keyboard::KeyCode::Escape | keyboard::KeyCode::Delete => {
+                    keyboard::KeyCode::Escape => {
                         // reset dragging state 
                         self.state.reset_selection();
 
                         // reset output pattern
                         self.state.output_pattern = self.state.base_pattern.clone();
-                    },
+                    }
+                    keyboard::KeyCode::Delete => {
+                        println!("keyboard::KeyCode::Delete");
+
+                        if self.state.is_dragging {
+                            // reset dragging state 
+                            self.state.reset_selection();
+                        } else {
+                            self.state.base_pattern.remove_selection();
+                        }
+                        
+                        // reset output pattern
+                        self.state.output_pattern = self.state.base_pattern.clone();
+                    }
                     keyboard::KeyCode::B => {
                         // reset dragging state 
                         match self.state.draw_mode {
@@ -499,7 +588,10 @@ pub struct State {
     last_drag_position: Point,
     pub selection_rectangle: Option<Rectangle>,
     pub modifiers: keyboard::Modifiers,
-    last_click: Option<mouse::Click>
+    last_click: Option<mouse::Click>,
+    b_pressed: bool,
+    del_pressed: bool,
+    last_selected_event_id: Option<(usize, usize)>
 }
 
 impl State {
@@ -518,14 +610,17 @@ impl State {
         Self {
             base_pattern: base_pattern.clone(),
             output_pattern: base_pattern.clone(),
-            draw_mode: DrawMode::Pen,
+            draw_mode: DrawMode::Cursor,
             is_dragging: false,
             is_logo_pressed: false,
             drag_origin: Point { x: 0.0, y: 0.0 },
             last_drag_position: Point { x: 0.0, y: 0.0 },
             selection_rectangle: None,
             modifiers: Default::default(),
-            last_click: None
+            last_click: None,
+            b_pressed: false,
+            del_pressed: false,
+            last_selected_event_id: None
         }
     }
 
@@ -593,24 +688,26 @@ where
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     if self.state.is_dragging {
-                        if  normalized_cursor_position.x - self.state.drag_origin.x > 0.01
-                            && normalized_cursor_position.y - self.state.drag_origin.y > 0.01 {
+                        if  (normalized_cursor_position.x - self.state.drag_origin.x > 0.0)
+                            | (normalized_cursor_position.y - self.state.drag_origin.y > 0.0)
+                            | (normalized_cursor_position.x - self.state.drag_origin.x < 0.0)
+                            | (normalized_cursor_position.y - self.state.drag_origin.y < 0.0) {
 
                             // we'll use that to default Option results with map_or
                             let none_value: usize = 1000;
 
                             // origin x cursor position, we check if it holds an event or not
-                            let origin_hovered_event = self.state.output_pattern
+                            let origin_hovered_event = self.state.base_pattern
                                 .to_owned()
                                 .get_hovered(self.state.drag_origin, normalized_bounds);
 
                             // previous x cursor position, we check if it holds an event or not
-                            let prev_hovered_event = self.state.output_pattern
+                            let prev_hovered_event = self.state.base_pattern
                                 .to_owned()
                                 .get_hovered(self.state.last_drag_position, normalized_bounds);
 
                             // current x cursor position, we check if it holds an event or not
-                            let hovered_event = self.state.output_pattern
+                            let hovered_event = self.state.base_pattern
                                 .to_owned()
                                 .get_hovered(normalized_cursor_position, normalized_bounds);
 
@@ -631,6 +728,8 @@ where
                                 width: normalized_cursor_position.x - self.state.drag_origin.x,
                                 height: normalized_cursor_position.y - self.state.drag_origin.y
                             };
+
+                            // println!("drag_bounds {:?}", drag_bounds);
 
                             let is_origin_inside_draggable_area = is_point_inside_draggable_area(self.state.drag_origin, normalized_bounds);
                             // let is_cursor_inside_draggable_area = is_point_inside_draggable_area(self.state.drag_origin, bounds);
@@ -687,41 +786,83 @@ where
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.state.reset_dragging_state();
 
+                    if bounds.contains(cursor_position) {
+                        if (normalized_cursor_position.x - self.state.drag_origin.x).abs() < 1.0 
+                            && (normalized_cursor_position.x - self.state.drag_origin.x).abs() < 1.0 {
+                            self.on_action(Actions::ClickRelease, normalized_bounds);
+                        }
+                    }
+                    
                     // commit ouput pattern changes to base_patern
                     self.state.base_pattern.data = self.state.output_pattern.data.clone();
-
-                    messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
 
                     return event::Status::Captured;
                 }
                 _ => {}
             },
             Event::Keyboard(keyboard_event) => match keyboard_event {
-                keyboard::Event::KeyPressed { modifiers, key_code } => {
+                keyboard::Event::KeyPressed { key_code, .. } => {
+                    println!("keyboard_event {:?}", keyboard_event);
+
+                    match key_code {
+                        keyboard::KeyCode::Escape => {
+                            if !self.state.del_pressed {
+                                self.state.del_pressed = true;
+
+                                // reset dragging state 
+                                self.state.reset_selection();
+                                self.state.output_pattern = self.state.base_pattern.clone();
+                                messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
+                            }
+                        }
+                        keyboard::KeyCode::Backspace => {
+                            if self.state.is_dragging && !self.state.del_pressed {
+                                self.state.del_pressed = true;
+                                // reset dragging state 
+                                self.state.reset_selection();
+                            } else {
+                                self.state.base_pattern.remove_selection();
+                            }
+
+                            self.state.output_pattern = self.state.base_pattern.clone();
+                            messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
+                        }
+                        keyboard::KeyCode::B => {
+                            if !self.state.b_pressed {
+                                self.state.b_pressed = true;
+                                self.state.draw_mode = DrawMode::Pen;
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    return event::Status::Captured;
+                } 
+                keyboard::Event::KeyReleased { key_code, .. } => {
+                    match key_code {
+                        keyboard::KeyCode::B => {
+                            self.state.b_pressed = false;
+                            self.state.draw_mode = DrawMode::Cursor;
+                        },
+                        keyboard::KeyCode::Escape | keyboard::KeyCode::Delete => {
+                            // reset dragging state 
+                            self.state.del_pressed = false;
+                        },
+                        _ => {}
+                    }
+
+                    return event::Status::Captured;
+                }            
+                keyboard::Event::ModifiersChanged(modifiers) => {
                     self.state.modifiers = modifiers;
 
-                    // set velocity mode if not dragging
+                    println!("{:?}", modifiers);
+
                     if !self.state.is_dragging && self.state.modifiers.logo {
                         self.state.is_logo_pressed = true;
                     } else if !self.state.modifiers.logo {
                         // or reset it
                         self.state.is_logo_pressed = false;
-                    }
-
-                    self.on_action(Actions::KeyAction(key_code), normalized_bounds);
-
-                    messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
-
-                    return event::Status::Captured;
-                }
-                keyboard::Event::KeyReleased { modifiers, .. } => {
-                    self.state.modifiers = modifiers;
-
-                    // reset velocity mode
-                    if !self.state.modifiers.logo {
-                        self.state.is_logo_pressed = false;
-
-                        messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
                     }
 
                     return event::Status::Captured;

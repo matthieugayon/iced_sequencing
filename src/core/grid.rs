@@ -14,8 +14,8 @@ pub const OFFSET_THRESHOLD: f32 = 0.15;
 
 pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
     return Point {
-        x: point.x - bounds.x,
-        y: point.y - bounds.y,
+        x: (point.x - bounds.x).min(bounds.width).max(0.0),
+        y: (point.y - bounds.y).min(bounds.height).max(0.0),
     }
 }
 
@@ -58,7 +58,7 @@ impl Default for GridEvent {
         GridEvent {
             offset: 0.0,
             velocity: DEFAULT_VELOCITY,
-            selected: false
+            selected: true
         }
     }
 }
@@ -106,28 +106,41 @@ impl GridPattern {
                 }
             },
             _ => {
-                // empty selection and add event
-                self.data.iter_mut().for_each(|((step, track), grid)| {
+                // add event
+                match self.data.get_mut(&grid_id) {
+                    Some(grid_event) => {
+                        grid_event.selected = true;
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
 
+    pub fn select_one(&mut self, grid_id: (usize, usize), modifiers: keyboard::Modifiers) {
+        match modifiers {
+            keyboard::Modifiers { shift: false, .. } => {
+                self.data.iter_mut().for_each(|((step, track), grid)| {
                     if *step == grid_id.0 && *track == grid_id.1 {
                         grid.selected = true;
                     } else {
                         grid.selected = false;
                     }
                 });
-            }
+            },
+            _ => {}
         }
     }
 
     pub fn select_area(&mut self, selection: Rectangle, bounds: Rectangle) {
         let step_size = get_step_dimensions(bounds);
-
         self.data.iter_mut().for_each(|((step, track), grid_event)| {
             let event_origin = get_event_absolute_position(*step, *track, grid_event.offset, bounds);
+
             let event_bounds = Rectangle {
                 x: event_origin.x,
                 y: event_origin.y,
-                width: step_size.width,
+                width: step_size.width - STEP_MARGIN_RIGHT,
                 height: step_size.height,
             };
 
@@ -158,6 +171,14 @@ impl GridPattern {
                 grid_event.selected = false;
             });
     }
+
+    pub fn remove_selection(&mut self) {
+        for ((step, track), event) in self.data.to_owned() {
+            if event.selected {
+                self.data.remove(&(step, track));
+            }
+        }
+    }
 }
 
 impl From<Pattern> for GridPattern {
@@ -180,7 +201,7 @@ impl From<GridPattern> for Pattern {
   fn from(grid: GridPattern) -> Self {
       let mut pattern = Pattern::new();
 
-      println!("{:?}", grid.data);
+      // println!("{:?}", grid.data);
 
 
       for ((step, track), event) in grid.data {
@@ -204,6 +225,7 @@ pub enum Actions {
     ),
     DoubleClick(Point),
     Click(Point),
+    ClickRelease,
     KeyAction(keyboard::KeyCode)
 }
 

@@ -47,12 +47,12 @@ impl Sandbox for App {
         let grid_widget = grid::Grid::new(
             &mut self.grid_state, 
             Message::NewPattern,
-            Length::from(Length::Units(1000)),
-            Length::from(Length::Units(400))
+            Length::from(Length::Units(984)),
+            Length::from(Length::Units(376))
         );
 
         let content: Element<_> = Column::new()
-            .max_width(1200)
+            .max_width(984)
             .align_items(Align::Center)
             .push(grid_widget)
             .push(Text::new(&self.output_text))
