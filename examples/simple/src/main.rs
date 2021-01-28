@@ -1,14 +1,13 @@
 // Import iced modules.
-use iced::{
-    Align, Column, Container, Element, Length, Sandbox, Settings, Text,
-};
+use iced::{Align, Column, Container, Element, Length, Sandbox, Settings, Text, Color, Row};
 // Import iced_audio modules.
-use iced_sequencing::grid;
+use iced_sequencing::{grid, multi_slider};
 use ganic_no_std::pattern::Pattern;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    NewPattern(Pattern)
+    NewPattern(Pattern),
+    NewSliders(Vec<f32>),
 }
 
 pub fn main() {
@@ -17,6 +16,8 @@ pub fn main() {
 
 pub struct App {
     grid_state: grid::State,
+    multi_slider_1_state: multi_slider::State,
+    multi_slider_2_state: multi_slider::State,
     output_text: String
 }
 
@@ -26,6 +27,8 @@ impl Sandbox for App {
     fn new() -> App {
         App {
             grid_state: grid::State::new(None),
+            multi_slider_1_state: multi_slider::State::new(vec![]),
+            multi_slider_2_state: multi_slider::State::new(vec![]),
             output_text: "Edit the grid!".into(),
         }
     }
@@ -40,10 +43,37 @@ impl Sandbox for App {
                 // self.output_text = format!("new pattern: {}", pattern.data);
                 // println!("{:?}", pattern.data);
             }
+            Message::NewSliders(values) => {
+                println!("{:?}", values);
+            }
         }
     }
 
     fn view(&mut self) -> Element<Message> {
+        let multi_slider_widget_1 = multi_slider::MultiSlider::new(
+            &mut self.multi_slider_1_state,
+            Message::NewSliders,
+            100,
+            100,
+            25,
+            Color::from_rgba(0.7, 0.7, 0.0, 1.0)
+        );
+
+        let multi_slider_widget_2 = multi_slider::MultiSlider::new(
+            &mut self.multi_slider_2_state,
+            Message::NewSliders,
+            200,
+            75,
+            10,
+            Color::from_rgba(0.0, 0.7, 0.7, 1.0)
+        );
+
+        let sliders_row = Row::new()
+            .padding(24)
+            .align_items(Align::Center)
+            .push(Column::new().padding(24).push(multi_slider_widget_1))
+            .push(Column::new().padding(24).push(multi_slider_widget_2));
+
         let grid_widget = grid::Grid::new(
             &mut self.grid_state, 
             Message::NewPattern,
@@ -54,9 +84,11 @@ impl Sandbox for App {
         let content: Element<_> = Column::new()
             .max_width(984)
             .align_items(Align::Center)
-            .push(grid_widget)
             .push(Text::new(&self.output_text))
+            .push(grid_widget)
+            .push(sliders_row)
             .into();
+
 
         Container::new(content)
             .width(Length::Fill)

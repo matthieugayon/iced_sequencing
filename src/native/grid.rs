@@ -10,13 +10,13 @@ use std::hash::Hash;
 use ganic_no_std::{NUM_PERCS, NUM_STEPS, pattern::Pattern};
 
 use crate::core::grid::{
-    STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM, 
+    STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM,
     CONTAINER_PADDING, OFFSET_THRESHOLD,
     Actions, DrawMode,
-    GridEvent, GridPattern, 
+    GridEvent, GridPattern,
     normalize_point, is_point_inside_draggable_area,
     get_event_absolute_position, get_step_dimensions
-}; 
+};
 
 /**
 * Actions we should implement :
@@ -44,7 +44,7 @@ fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(
     let step_size = get_step_dimensions(bounds);
 
     println!("get_hovered_step {:?}", step_size);
-    
+
     if bounded {
         if is_point_inside_draggable_area(cursor, bounds) {
             let step = ((cursor.x - CONTAINER_PADDING) / step_size.width) as usize;
@@ -106,7 +106,7 @@ fn move_selection(
             println!("event_position {:?}", event_position);
             println!("next_event_position {:?}", next_event_position);
             println!("normalized_bounds {:?}", normalized_bounds);
-            
+
             // with unbounded flag we must get smthg back
             let cursor_step = get_hovered_step(next_event_position, normalized_bounds, false).unwrap();
 
@@ -173,10 +173,10 @@ fn move_selection(
                         // - main rule : only used positive offset unless there is already an event on the same step
                         // - Duplicates : on small values , we will start with negative offsets on next step if we move to the right,
                         //   and juste move selection if we move to the left ... phew 
-                        
+
                         let hovered_event = base_pattern.data.get(&(cursor_step.0, next_track));
                         let next_track_event = base_pattern.data.get(&(cursor_step.0 + 1, next_track));
-        
+
                         if duplicate {
                             // select event
                             let original_event = output.get_mut(&(step, track)).unwrap();
@@ -230,7 +230,7 @@ fn move_selection(
                                                     selected: true
                                                 });
                                             }
-                                            
+
                                         } else {
                                             output.insert((cursor_step.0 + 1, next_track), GridEvent {
                                                 offset: cursor_step.2 - 1.0,
@@ -454,7 +454,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                                     // we can only drag if origin of dragging is hovering an event
                                     Some((_, grid_event)) => {
                                         // TODO double check if we should check that on output_patern or base_pattern
-                                                                                
+
                                         if !self.state.base_pattern.to_owned().get_selection().is_empty() {
                                             let quantize = !self.state.modifiers.logo;
                                             let duplicate = self.state.modifiers.alt;
@@ -472,7 +472,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                                         } else {
                                             // draw selection and add grid events to selection
                                             self.create_selection_area(drag_bounds, bounds);
-                                        }        
+                                        }
                                     }
                                     None => {
                                         // draw selection and add grid events to selection
@@ -482,7 +482,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                             } else {
                                 // draw selection and add grid events to selection
                                 self.create_selection_area(drag_bounds, bounds);
-                            }   
+                            }
                         }
                     }
                 }
@@ -555,7 +555,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                         } else {
                             self.state.base_pattern.remove_selection();
                         }
-                        
+
                         // reset output pattern
                         self.state.output_pattern = self.state.base_pattern.clone();
                     }
@@ -713,7 +713,7 @@ where
 
                             // get unbounded cursor step hover
                             // let hovered_step = get_hovered_step(cursor_position, bounds, false);   
-                                
+
                             // let's just extract the (step, track) to compare them
                             // (we cannot have two events on the same step, so they must either be different or the same one)
                             let prev_hovered_id = prev_hovered_event.map_or((none_value, none_value), |x| x.0);
@@ -787,12 +787,12 @@ where
                     self.state.reset_dragging_state();
 
                     if bounds.contains(cursor_position) {
-                        if (normalized_cursor_position.x - self.state.drag_origin.x).abs() < 1.0 
+                        if (normalized_cursor_position.x - self.state.drag_origin.x).abs() < 1.0
                             && (normalized_cursor_position.x - self.state.drag_origin.x).abs() < 1.0 {
                             self.on_action(Actions::ClickRelease, normalized_bounds);
                         }
                     }
-                    
+
                     // commit ouput pattern changes to base_patern
                     self.state.base_pattern.data = self.state.output_pattern.data.clone();
 
@@ -837,7 +837,7 @@ where
                     }
 
                     return event::Status::Captured;
-                } 
+                }
                 keyboard::Event::KeyReleased { key_code, .. } => {
                     match key_code {
                         keyboard::KeyCode::B => {
@@ -852,7 +852,7 @@ where
                     }
 
                     return event::Status::Captured;
-                }            
+                }
                 keyboard::Event::ModifiersChanged(modifiers) => {
                     self.state.modifiers = modifiers;
 
@@ -900,6 +900,7 @@ where
         self.height.hash(state);
     }
 }
+
 pub trait Renderer: iced_native::Renderer {
     /// The style supported by this renderer.
     type Style: Default;

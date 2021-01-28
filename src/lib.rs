@@ -12,6 +12,14 @@ mod platform {
     pub use {
         grid::Grid
     };
+
+    #[doc(no_inline)]
+    pub use crate::graphics::multi_slider;
+
+    #[doc(no_inline)]
+    pub use {
+        multi_slider::MultiSlider
+    };
 }
 
 #[doc(no_inline)]
