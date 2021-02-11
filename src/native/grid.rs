@@ -77,7 +77,7 @@ fn move_selection(
     let step_size = get_step_dimensions(normalized_bounds);
 
     // TESTS 
-    // let origin_offset_left = step_size.width * origin_event.offset;
+    let origin_offset_left = step_size.width * origin_event.offset;
     // let origin_offset_right = step_size.width - same_step_offset_left;
 
     // let drag_step = {
@@ -89,6 +89,25 @@ fn move_selection(
 
     //     2
     // };
+
+    if quantized {
+        let mut step_offset = 0;
+
+        if drag_bounds.width >= 0.0 {
+            step_offset = (((step_size.width * 0.5) + drag_bounds.width) / step_size.width) as i32;
+        } else {
+            step_offset = ((drag_bounds.width - (step_size.width * 0.5)) / step_size.width) as i32;
+        }
+
+        if origin_event.offset > 0.0 {
+            
+        } else if origin_event.offset < 0.0 {
+            
+        }
+    }
+
+
+
 
 
 
