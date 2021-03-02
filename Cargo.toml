@@ -19,3 +19,4 @@ iced = "0.2"
 iced_native = "0.3"
 iced_graphics = { version = "0.1", features = ["canvas"] }
 ganic-no-std = { path = "../ganic_rs-workspace/ganic-no-std" }
+machine = "^0.2"

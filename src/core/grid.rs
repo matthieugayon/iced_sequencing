@@ -46,6 +46,30 @@ pub fn get_event_absolute_position(step: usize, track: usize, offset: f32, bound
   }
 }
 
+pub fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(usize, usize, f32)> {
+    let step_size = get_step_dimensions(bounds);
+
+    println!("get_hovered_step {:?}", step_size);
+    
+    if bounded {
+        if is_point_inside_draggable_area(cursor, bounds) {
+            let step = ((cursor.x - CONTAINER_PADDING) / step_size.width) as usize;
+            let track = ((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize;
+            let offset = (cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)) / step_size.width;
+
+            Some((step, track, offset))
+        } else {
+            None
+        }
+    } else {
+        let step = (((cursor.x - CONTAINER_PADDING) / step_size.width) as usize).max(0).min(NUM_STEPS);
+        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS);
+        let offset = ((cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)) / step_size.width).max(-0.99).min(0.99);
+
+        Some((step, track, offset))
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct GridEvent {
     pub offset: f32,
@@ -91,45 +115,37 @@ impl GridPattern {
             })
     }
 
-    pub fn select(&mut self, grid_id: (usize, usize), modifiers: keyboard::Modifiers) {
-        match modifiers {
-            keyboard::Modifiers { shift: true, .. } => {
-                match self.data.get_mut(&grid_id) {
-                    Some(grid_event) => {
-                        if grid_event.selected {
-                            grid_event.selected = false;
-                        } else {
-                            grid_event.selected = true;
-                        }
-                    }
-                    None => {}
-                }
-            },
-            _ => {
-                // add event
-                match self.data.get_mut(&grid_id) {
-                    Some(grid_event) => {
-                        grid_event.selected = true;
-                    }
-                    None => {}
+    pub fn toggle_select(&mut self, grid_id: (usize, usize)) {
+        match self.data.get_mut(&grid_id) {
+            Some(grid_event) => {
+                if grid_event.selected {
+                    grid_event.selected = false;
+                } else {
+                    grid_event.selected = true;
                 }
             }
+            None => {}
         }
     }
 
-    pub fn select_one(&mut self, grid_id: (usize, usize), modifiers: keyboard::Modifiers) {
-        match modifiers {
-            keyboard::Modifiers { shift: false, .. } => {
-                self.data.iter_mut().for_each(|((step, track), grid)| {
-                    if *step == grid_id.0 && *track == grid_id.1 {
-                        grid.selected = true;
-                    } else {
-                        grid.selected = false;
-                    }
-                });
-            },
-            _ => {}
+    pub fn select(&mut self, grid_id: (usize, usize)) {
+        // add event
+        match self.data.get_mut(&grid_id) {
+            Some(grid_event) => {
+                grid_event.selected = true;
+            }
+            None => {}
         }
+    }
+
+    pub fn select_one(&mut self, grid_id: (usize, usize)) {
+        self.data.iter_mut().for_each(|((step, track), grid)| {
+            if *step == grid_id.0 && *track == grid_id.1 {
+                grid.selected = true;
+            } else {
+                grid.selected = false;
+            }
+        });
     }
 
     pub fn select_area(&mut self, selection: Rectangle, bounds: Rectangle) {
@@ -178,6 +194,14 @@ impl GridPattern {
                 self.data.remove(&(step, track));
             }
         }
+    }
+
+    pub fn move_selection_quantized(&mut self) {
+        
+    }
+
+    pub fn move_selection_unquantized(&mut self) {
+        
     }
 }
 

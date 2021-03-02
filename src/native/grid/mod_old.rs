@@ -18,6 +18,8 @@ use crate::core::grid::{
     get_event_absolute_position, get_step_dimensions
 }; 
 
+pub mod modes;
+
 /**
 * Actions we should implement :
 * - double ckick => Toggle (Add or Remove) event on cursor position (if Add => quantized)
