@@ -118,8 +118,7 @@ impl State {
     fn handle_transition(&mut self, transition: Transition) {
         match transition {
             Transition::ChangeState(new_state) => {
-                println!(
-                    "Changing state {:?} => {:?}",
+                println!("Changing state {:?} => {:?}",
                     self.current_state,
                     new_state
                 );

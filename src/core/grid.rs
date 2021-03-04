@@ -30,6 +30,14 @@ pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
     return draggable_area.contains(point)
 }
 
+// cursor and bounds are normalized normalized
+pub fn pad_cursor(point: Point, bounds: Rectangle) -> Point {
+    return Point {
+        x: point.x.min(bounds.width - CONTAINER_PADDING).max(CONTAINER_PADDING),
+        y: point.y.min(bounds.height - CONTAINER_PADDING).max(CONTAINER_PADDING),
+    }
+}
+
 pub fn get_step_dimensions(bounds: Rectangle) -> Size {
   return Size {
       width: (bounds.width - (2.0 * CONTAINER_PADDING)) / NUM_STEPS as f32,
@@ -48,8 +56,6 @@ pub fn get_event_absolute_position(step: usize, track: usize, offset: f32, bound
 
 pub fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(usize, usize, f32)> {
     let step_size = get_step_dimensions(bounds);
-
-    println!("get_hovered_step {:?}", step_size);
     
     if bounded {
         if is_point_inside_draggable_area(cursor, bounds) {
@@ -62,8 +68,8 @@ pub fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Opti
             None
         }
     } else {
-        let step = (((cursor.x - CONTAINER_PADDING) / step_size.width) as usize).max(0).min(NUM_STEPS);
-        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS);
+        let step = (((cursor.x - CONTAINER_PADDING) / step_size.width) as usize).max(0).min(NUM_STEPS - 1);
+        let track = (((cursor.y - CONTAINER_PADDING) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS - 1);
         let offset = ((cursor.x - (CONTAINER_PADDING + step as f32 * step_size.width)) / step_size.width).max(-0.99).min(0.99);
 
         Some((step, track, offset))
@@ -196,8 +202,38 @@ impl GridPattern {
         }
     }
 
-    pub fn move_selection_quantized(&mut self) {
-        
+    pub fn move_selection_quantized(
+        &mut self, 
+        bounds: Rectangle,
+        cursor: Point,
+        previous_position: Option<Point>,
+        origin_grid_id: (usize, usize)
+    ) {
+        // cursor is normalized and padded, it cannto be outside
+        // so it must be hovering a step
+        let hovered_step = get_hovered_step(cursor, bounds, false).unwrap();
+
+        let step_offset: isize = hovered_step.0 as isize - origin_grid_id.0 as isize;
+        let track_offset: isize = hovered_step.1 as isize - origin_grid_id.1 as isize;
+
+        for ((step, track), event) in self.data.to_owned() {
+            if event.selected {
+                let next_step = ((step as isize + step_offset) as usize) % NUM_STEPS;
+                let next_track = ((track as isize + track_offset) as usize) % NUM_PERCS;
+
+                self.data.remove(&(step, track));
+
+                match self.data.get(&(next_step, next_track)) {
+                    Some(_) => {
+                        self.data.remove(&(next_step, next_track));
+                        self.data.insert((next_step, next_track), event);
+                    }
+                    None => {
+                        self.data.insert((next_step, next_track), event);
+                    }
+                }
+            }
+        }
     }
 
     pub fn move_selection_unquantized(&mut self) {
