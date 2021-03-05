@@ -119,7 +119,7 @@ impl WidgetState for Waiting {
                     context.output_pattern = context.base_pattern.clone();
                 }
 
-                Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(cursor, grid_id, None)))
+                Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(cursor, grid_id)))
             }
             // otherwise add event
             None => {
@@ -173,16 +173,14 @@ impl WidgetState for Selecting {
 #[derive(Debug, Default)]
 struct MovingSelectionQuantized {
     origin: Point,
-    origin_grid_id: (usize, usize),
-    previous_position: Option<Point>
+    origin_grid_id: (usize, usize)
 }
 
 impl MovingSelectionQuantized {
-    fn from_args(point: Point, grid_id: (usize, usize), option_point: Option<Point>) -> Self {
+    fn from_args(point: Point, grid_id: (usize, usize)) -> Self {
         MovingSelectionQuantized {
             origin: point,
-            origin_grid_id: grid_id,
-            previous_position: option_point
+            origin_grid_id: grid_id
         }
     }
 }
@@ -191,26 +189,17 @@ impl WidgetState for MovingSelectionQuantized {
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {  
         // cursor cannot get out of the grid area (container padding excluded)
         let padded_cursor = pad_cursor(cursor, bounds);
-        // let drag_bounds = Rectangle {
-        //     x: self.origin.x,
-        //     y: self.origin.y,
-        //     width: padded_cursor.x - self.origin.x,
-        //     height: padded_cursor.y - self.origin.y
-        // };
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_quantized(bounds, padded_cursor, self.previous_position, self.origin_grid_id);
-
-        // update previous position
-        self.previous_position = Some(padded_cursor);
+        context.output_pattern.move_selection_quantized(bounds, padded_cursor, self.origin_grid_id);
 
         Transition::DoNothing
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> Transition {
         if modifiers.logo {
-            Transition::ChangeState(Box::new(MovingSelectionUnquantized::from_args(self.origin, self.origin_grid_id, self.previous_position)))
+            Transition::ChangeState(Box::new(MovingSelectionUnquantized::from_args(self.origin, self.origin_grid_id)))
         } else {
             Transition::DoNothing
         }
@@ -227,36 +216,48 @@ impl WidgetState for MovingSelectionQuantized {
 #[derive(Debug, Default)]
 struct MovingSelectionUnquantized {
     origin: Point,
-    origin_grid_id: (usize, usize),
-    previous_position: Option<Point>
+    origin_grid_id: (usize, usize)
 }
 
 impl MovingSelectionUnquantized {
-    fn from_args(point: Point, grid_id: (usize, usize), option_point: Option<Point>) -> Self {
+    fn from_args(point: Point, grid_id: (usize, usize)) -> Self {
         MovingSelectionUnquantized {
             origin: point,
-            origin_grid_id: grid_id,
-            previous_position: option_point
+            origin_grid_id: grid_id
         }
     }
 }
 
 impl WidgetState for MovingSelectionUnquantized {
-    fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, _context: &mut WidgetContext) -> Transition {
+    fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {
+        // cursor cannot get out of the grid area (container padding excluded)
         let padded_cursor = pad_cursor(cursor, bounds);
-        self.previous_position = Some(padded_cursor);
+        let drag_bounds = Rectangle {
+            x: self.origin.x,
+            y: self.origin.y,
+            width: padded_cursor.x - self.origin.x,
+            height: padded_cursor.y - self.origin.y
+        };
+
+        // set and mutate output pattern
+        context.output_pattern = context.base_pattern.clone();
+        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, padded_cursor, self.origin_grid_id);
+
         Transition::DoNothing
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> Transition {
         if !modifiers.logo {
-            Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(self.origin, self.origin_grid_id, self.previous_position)))
+            Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(self.origin, self.origin_grid_id)))
         } else {
             Transition::DoNothing
         }
     }
 
-    fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, _context: &mut WidgetContext) -> Transition {
+    fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, context: &mut WidgetContext) -> Transition {
+        // commit ouput pattern changes to base_patern
+        context.base_pattern.data = context.output_pattern.data.clone();
+
         Transition::ChangeState(Box::new(Waiting::default()))
     }
 }

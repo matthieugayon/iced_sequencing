@@ -166,11 +166,14 @@ where
     ) -> event::Status {
         let bounds = layout.bounds();
 
-        // println!("on_event bounds {:?}", bounds);
-        // println!("cursor_position {:?}", cursor_position);
-
         // dispatch events to our state machine whose states (modes) and substates are defined 
         // in ./modes
+
+        // this is for a bug happening randomly when the cursor leaves the window
+        // @TODO: write an issue in the iced repo
+        if cursor_position.x < 0. && cursor_position.y < 0. {
+            return event::Status::Ignored
+        }
 
         let normalized_cursor_position = normalize_point(cursor_position, bounds);
         let normalized_bounds = Rectangle {
