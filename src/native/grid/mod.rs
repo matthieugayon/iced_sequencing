@@ -112,6 +112,7 @@ impl State {
             &mut *self.current_state,
             &mut self.context
         );
+
         self.handle_transition(transition);
     }
 

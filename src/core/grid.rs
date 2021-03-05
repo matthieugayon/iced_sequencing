@@ -216,24 +216,34 @@ impl GridPattern {
         let step_offset: isize = hovered_step.0 as isize - origin_grid_id.0 as isize;
         let track_offset: isize = hovered_step.1 as isize - origin_grid_id.1 as isize;
 
+        // init empty hashmap
+        let mut output: HashMap<(usize, usize), GridEvent>  = HashMap::new();
+
+        // copy non selected events
+        for ((step, track), event) in self.data.to_owned() {
+            if !event.selected {
+                output.insert((step, track), event);
+            }
+        }
+
         for ((step, track), event) in self.data.to_owned() {
             if event.selected {
-                let next_step = ((step as isize + step_offset) as usize) % NUM_STEPS;
-                let next_track = ((track as isize + track_offset) as usize) % NUM_PERCS;
+                let next_step = (step as isize + step_offset + NUM_STEPS as isize) as usize % NUM_STEPS;
+                let next_track = (track as isize + track_offset + NUM_PERCS as isize) as usize % NUM_PERCS;
 
-                self.data.remove(&(step, track));
-
-                match self.data.get(&(next_step, next_track)) {
+                match output.get(&(next_step, next_track)) {
                     Some(_) => {
-                        self.data.remove(&(next_step, next_track));
-                        self.data.insert((next_step, next_track), event);
+                        output.remove(&(next_step, next_track));
+                        output.insert((next_step, next_track), event);
                     }
                     None => {
-                        self.data.insert((next_step, next_track), event);
+                        output.insert((next_step, next_track), event);
                     }
                 }
             }
         }
+
+        self.data = output;
     }
 
     pub fn move_selection_unquantized(&mut self) {

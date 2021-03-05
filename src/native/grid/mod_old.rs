@@ -132,7 +132,7 @@ fn move_selection(
             let cursor_step = get_hovered_step(next_event_position, normalized_bounds, false).unwrap();
 
             // cast y position to new track usize
-            // WARNING : ther's a possibility of direction mistake here
+            // WARNING : there's a possibility of direction mistake here
             let track_offset: isize = ((drag_bounds.height / (step_size.height + TRACK_MARGIN_BOTTOM)) as isize)
                 .max(-(NUM_PERCS as isize)).min(NUM_PERCS as isize);
             let next_track = ((track as isize + track_offset) as usize) % NUM_PERCS;

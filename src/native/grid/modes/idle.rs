@@ -12,7 +12,7 @@ impl WidgetState for Idle {
         if let Transition::ChangeState(new_state) =
             self.nested.on_click(bounds, cursor, context)
         {
-            self.nested = new_state;
+            self.next(new_state);
         }
 
         Transition::DoNothing
@@ -22,7 +22,7 @@ impl WidgetState for Idle {
         if let Transition::ChangeState(new_state) =
             self.nested.on_double_click(bounds, cursor, context)
         {
-            self.nested = new_state;
+            self.next(new_state);
         }
 
         Transition::DoNothing
@@ -32,7 +32,7 @@ impl WidgetState for Idle {
         if let Transition::ChangeState(new_state) =
             self.nested.on_button_release(bounds, cursor, context)
         {
-            self.nested = new_state;
+            self.next(new_state);
         }
 
         Transition::DoNothing
@@ -42,7 +42,7 @@ impl WidgetState for Idle {
         if let Transition::ChangeState(new_state) =
             self.nested.on_cursor_moved(bounds, cursor, context)
         {
-            self.nested = new_state;
+            self.next(new_state);
         }
 
         Transition::DoNothing
@@ -52,10 +52,19 @@ impl WidgetState for Idle {
         if let Transition::ChangeState(new_state) =
             self.nested.on_modifier_change(modifiers, context)
         {
-            self.nested = new_state;
+            self.next(new_state);
         }
 
         Transition::DoNothing
+    }
+
+    fn next(&mut self, next_state: Box<dyn WidgetState>) {
+        println!("Idle: changing sub state {:?} => {:?}",
+            self.nested,
+            next_state
+        );
+
+        self.nested = next_state;
     }
 }
 
@@ -100,7 +109,6 @@ impl WidgetState for Waiting {
     }
 
     fn on_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {
-
         // check if we hover an event on the grid
         match context.base_pattern.clone().get_hovered(cursor, bounds) {
             // if yes remove event
@@ -190,12 +198,9 @@ impl WidgetState for MovingSelectionQuantized {
         //     height: padded_cursor.y - self.origin.y
         // };
 
-        // start from base_pattern
-        let mut output_pattern: GridPattern = context.base_pattern.clone();
-        output_pattern.move_selection_quantized(bounds, padded_cursor, self.previous_position, self.origin_grid_id);
-
-        // set output_pattern
-        context.output_pattern = output_pattern;
+        // set and mutate output pattern
+        context.output_pattern = context.base_pattern.clone();
+        context.output_pattern.move_selection_quantized(bounds, padded_cursor, self.previous_position, self.origin_grid_id);
 
         // update previous position
         self.previous_position = Some(padded_cursor);

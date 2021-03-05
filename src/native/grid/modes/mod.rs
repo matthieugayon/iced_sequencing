@@ -48,7 +48,7 @@ pub trait WidgetState: Debug {
 
     fn on_key_pressed(
         &mut self,
-        _keyCode: keyboard::KeyCode,
+        _key_code: keyboard::KeyCode,
         _context: &mut WidgetContext
     ) -> Transition {
         Transition::DoNothing
@@ -56,7 +56,7 @@ pub trait WidgetState: Debug {
 
     fn on_key_released(
         &mut self,
-        _keyCode: keyboard::KeyCode,
+        _key_code: keyboard::KeyCode,
         _context: &mut WidgetContext
     ) -> Transition {
         Transition::DoNothing
@@ -69,6 +69,11 @@ pub trait WidgetState: Debug {
     ) -> Transition {
         Transition::DoNothing
     }
+
+    fn next(
+       &mut self,
+       next_state: Box<dyn WidgetState>
+    ) {}
 }
 
 
