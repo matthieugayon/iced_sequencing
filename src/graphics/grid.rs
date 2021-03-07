@@ -1,4 +1,4 @@
-use crate::native::grid;
+use crate::{core::grid::GridEvent, native::grid};
 use iced_graphics::{Backend, Primitive, Renderer};
 use iced_native::{mouse, Background, Point, Rectangle, Color, Size};
 use crate::core::grid::{
@@ -126,11 +126,37 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size) -> 
         height: bounds.height
     };
 
+    let mut events: Vec<(usize, usize, GridEvent)> = grid_pattern.data
+        .iter()
+        .map(|((step, track), grid_event)| {
+            (*step, *track, *grid_event)
+        })
+        .collect();
+
+    events.sort_by(|x,y| {
+        if x.1 == y.1 {
+            return x.0.cmp(&y.0).reverse()
+        }
+        x.1.cmp(&y.1)
+    });
+
+    let mut sorted_events: Vec<&(usize, usize, GridEvent)> = events
+        .iter()
+        .filter(|(_, _, e)| e.selected)
+        .collect();
+
+    let unselected_events: Vec<&(usize, usize, GridEvent)> = events
+        .iter()
+        .filter(|(_, _, e)| !e.selected)
+        .collect();
+
+    sorted_events.extend_from_slice(&unselected_events);
+
     Primitive::Group {
-        primitives: grid_pattern.data
-            .iter()
-            .map(|((step, track), grid_event)| {
+        primitives: sorted_events.iter()
+            .map(|(step, track, grid_event)| {
                 let event_position = get_event_absolute_position(*step, *track, grid_event.offset, normalized_bounds);
+                let step_position = get_event_absolute_position(*step, *track, 0., normalized_bounds);
                 let event_offset_y = CONTAINER_PADDING + (*track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM));
                 let border_width: f32 = {
                     if grid_event.selected {
@@ -148,17 +174,35 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size) -> 
                     }
                 };
 
-                Primitive::Quad {
-                    bounds: Rectangle{
-                        x: event_position.x + bounds.x,
-                        y: event_offset_y + bounds.y,
-                        width: step_size.width - STEP_MARGIN_RIGHT,
-                        height: step_size.height,
-                    },
-                    background: Background::Color(Color::from_rgba(0.0, 1.0, 0.0, 0.5)),
-                    border_radius: 0.0,
-                    border_width,
-                    border_color
+                Primitive::Group {
+                    primitives: vec![
+                        // event
+                        Primitive::Quad {
+                            bounds: Rectangle{
+                                x: event_position.x + bounds.x,
+                                y: event_offset_y + bounds.y,
+                                width: step_size.width - STEP_MARGIN_RIGHT,
+                                height: step_size.height,
+                            },
+                            background: Background::Color(Color::from_rgba(0.0, 1.0, 0.0, 0.5)),
+                            border_radius: 0.0,
+                            border_width,
+                            border_color
+                        },
+                        // offset marker
+                        Primitive::Quad {
+                            bounds: Rectangle{
+                                x: { if grid_event.offset >= 0. { step_position.x + bounds.x } else { event_position.x + bounds.x }},
+                                y: event_offset_y + bounds.y + step_size.height - 2.,
+                                width: { if grid_event.offset >= 0. { event_position.x - step_position.x } else { step_position.x - event_position.x }},
+                                height: 0.,
+                            },
+                            background:  Background::Color(Color::BLACK),
+                            border_radius: 0.0,
+                            border_width: 2.0,
+                            border_color: Color::BLACK
+                        },
+                    ]
                 }
             })
             .collect()

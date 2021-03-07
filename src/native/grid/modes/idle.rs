@@ -59,10 +59,10 @@ impl WidgetState for Idle {
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState>) {
-        println!("Idle: changing sub state {:?} => {:?}",
-            self.nested,
-            next_state
-        );
+        // println!("Idle: changing sub state {:?} => {:?}",
+        //     self.nested,
+        //     next_state
+        // );
 
         self.nested = next_state;
     }
