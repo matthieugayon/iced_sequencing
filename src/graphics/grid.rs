@@ -135,22 +135,22 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size) -> 
 
     events.sort_by(|x,y| {
         if x.1 == y.1 {
-            return x.0.cmp(&y.0).reverse()
+            return x.0.cmp(&y.0)
         }
         x.1.cmp(&y.1)
     });
 
-    let mut sorted_events: Vec<&(usize, usize, GridEvent)> = events
+    let selected_events: Vec<&(usize, usize, GridEvent)> = events
         .iter()
         .filter(|(_, _, e)| e.selected)
         .collect();
 
-    let unselected_events: Vec<&(usize, usize, GridEvent)> = events
+    let mut sorted_events: Vec<&(usize, usize, GridEvent)> = events
         .iter()
         .filter(|(_, _, e)| !e.selected)
         .collect();
 
-    sorted_events.extend_from_slice(&unselected_events);
+        sorted_events.extend_from_slice(&selected_events);
 
     Primitive::Group {
         primitives: sorted_events.iter()
@@ -193,13 +193,13 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size) -> 
                         Primitive::Quad {
                             bounds: Rectangle{
                                 x: { if grid_event.offset >= 0. { step_position.x + bounds.x } else { event_position.x + bounds.x }},
-                                y: event_offset_y + bounds.y + step_size.height - 2.,
+                                y: event_offset_y + bounds.y + step_size.height,
                                 width: { if grid_event.offset >= 0. { event_position.x - step_position.x } else { step_position.x - event_position.x }},
-                                height: 0.,
+                                height: 2.,
                             },
                             background:  Background::Color(Color::BLACK),
                             border_radius: 0.0,
-                            border_width: 2.0,
+                            border_width: 0.,
                             border_color: Color::BLACK
                         },
                     ]
