@@ -112,14 +112,14 @@ impl WidgetState for Waiting {
         // check if we hover an event on the grid
         match context.base_pattern.clone().get_hovered(cursor, bounds) {
             // if yes remove event
-            Some((grid_id, grid_event)) => {
+            Some(((step, track), grid_event)) => {
                 if !grid_event.selected {
-                    context.base_pattern.select_one(grid_id);
+                    context.base_pattern.select_one((step, track));
                     // replicate base pattern to drawing pattern
                     context.output_pattern = context.base_pattern.clone();
                 }
 
-                Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(cursor, grid_id)))
+                Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(cursor, (step, track, grid_event))))
             }
             // otherwise add event
             None => {
@@ -173,14 +173,14 @@ impl WidgetState for Selecting {
 #[derive(Debug, Default)]
 struct MovingSelectionQuantized {
     origin: Point,
-    origin_grid_id: (usize, usize)
+    origin_event: (usize, usize, GridEvent)
 }
 
 impl MovingSelectionQuantized {
-    fn from_args(point: Point, grid_id: (usize, usize)) -> Self {
+    fn from_args(point: Point, event: (usize, usize, GridEvent)) -> Self {
         MovingSelectionQuantized {
             origin: point,
-            origin_grid_id: grid_id
+            origin_event: event
         }
     }
 }
@@ -189,17 +189,23 @@ impl WidgetState for MovingSelectionQuantized {
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {  
         // cursor cannot get out of the grid area (container padding excluded)
         let padded_cursor = pad_cursor(cursor, bounds);
+        let drag_bounds = Rectangle {
+            x: self.origin.x,
+            y: self.origin.y,
+            width: padded_cursor.x - self.origin.x,
+            height: padded_cursor.y - self.origin.y
+        };
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_quantized(bounds, padded_cursor, self.origin_grid_id);
+        context.output_pattern.move_selection_quantized(bounds, drag_bounds, padded_cursor, self.origin_event);
 
         Transition::DoNothing
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> Transition {
         if modifiers.logo {
-            Transition::ChangeState(Box::new(MovingSelectionUnquantized::from_args(self.origin, self.origin_grid_id)))
+            Transition::ChangeState(Box::new(MovingSelectionUnquantized::from_args(self.origin, self.origin_event)))
         } else {
             Transition::DoNothing
         }
@@ -216,14 +222,14 @@ impl WidgetState for MovingSelectionQuantized {
 #[derive(Debug, Default)]
 struct MovingSelectionUnquantized {
     origin: Point,
-    origin_grid_id: (usize, usize)
+    origin_event: (usize, usize, GridEvent)
 }
 
 impl MovingSelectionUnquantized {
-    fn from_args(point: Point, grid_id: (usize, usize)) -> Self {
+    fn from_args(point: Point, event: (usize, usize, GridEvent)) -> Self {
         MovingSelectionUnquantized {
             origin: point,
-            origin_grid_id: grid_id
+            origin_event: event
         }
     }
 }
@@ -241,14 +247,14 @@ impl WidgetState for MovingSelectionUnquantized {
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, padded_cursor, self.origin_grid_id);
+        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, padded_cursor, self.origin_event);
 
         Transition::DoNothing
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> Transition {
         if !modifiers.logo {
-            Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(self.origin, self.origin_grid_id)))
+            Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(self.origin, self.origin_event)))
         } else {
             Transition::DoNothing
         }
