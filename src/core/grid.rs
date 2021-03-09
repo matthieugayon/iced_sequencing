@@ -23,10 +23,10 @@ pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
 
 pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
     let draggable_area = Rectangle {
-        x: CONTAINER_PADDING_TOP,
-        y: CONTAINER_PADDING_LEFT,
-        width: bounds.width - CONTAINER_PADDING_TOP,
-        height: bounds.height - CONTAINER_PADDING_LEFT
+        x: CONTAINER_PADDING_LEFT,
+        y: CONTAINER_PADDING_TOP,
+        width: bounds.width - CONTAINER_PADDING_LEFT,
+        height: bounds.height - CONTAINER_PADDING_TOP
     };
     
     return draggable_area.contains(point)

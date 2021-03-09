@@ -63,7 +63,7 @@ impl Sandbox for App {
             &mut self.grid_state, 
             Message::NewPattern,
             Length::from(Length::Units(855)),
-            Length::from(Length::Units(245))
+            Length::from(Length::Units(475))
         );
 
         let content: Element<_> = Column::new()
