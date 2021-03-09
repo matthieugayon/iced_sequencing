@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use iced_native::{
     event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout,
@@ -7,15 +7,10 @@ use iced_native::{
 
 use std::hash::Hash;
 
-use ganic_no_std::{NUM_PERCS, NUM_STEPS, pattern::Pattern};
+use ganic_no_std::{pattern::Pattern};
 
 use crate::core::grid::{
-    STEP_MARGIN_RIGHT, TRACK_MARGIN_BOTTOM, 
-    CONTAINER_PADDING, OFFSET_THRESHOLD,
-    Actions, DrawMode,
-    GridEvent, GridPattern, 
-    normalize_point, is_point_inside_draggable_area,
-    get_event_absolute_position, get_step_dimensions
+    GridPattern, normalize_point
 }; 
 
 pub mod modes;
@@ -25,7 +20,7 @@ use modes::{WidgetState, Transition, Idle};
 
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
     state: &'a mut State,
-    on_change: Box<dyn Fn(Pattern) -> Message>,
+    _on_change: Box<dyn Fn(Pattern) -> Message>,
     width: Length,
     height: Length,
     style: Renderer::Style
@@ -43,7 +38,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     {
         Grid {
             state,
-            on_change: Box::new(on_change),
+            _on_change: Box::new(on_change),
             width,
             height,
             style: Renderer::Style::default()
@@ -160,7 +155,7 @@ where
         event: Event,
         layout: Layout<'_>,
         cursor_position: Point,
-        messages: &mut Vec<Message>,
+        _messages: &mut Vec<Message>,
         _renderer: &Renderer,
         _clipboard: Option<&dyn Clipboard>,
     ) -> event::Status {

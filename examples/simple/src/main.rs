@@ -1,10 +1,27 @@
 // Import iced modules.
 use iced::{
-    Align, Column, Container, Element, Length, Sandbox, Settings, Text,
+    Align, Column, Container, Element, Length, Sandbox,
+    Settings, Color, container
 };
 // Import iced_audio modules.
 use iced_sequencing::grid;
 use ganic_no_std::pattern::Pattern;
+
+const WINDOW_BG_COLOR: Color = Color::from_rgb(
+    0x25 as f32 / 255.0,
+    0x22 as f32 / 255.0,
+    0x2A as f32 / 255.0, //180b28
+);
+pub struct MainContainerStyle;
+
+impl container::StyleSheet for MainContainerStyle {
+    fn style(&self) -> container::Style {
+        container::Style {
+            background: WINDOW_BG_COLOR.into(),
+            ..container::Style::default()
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -16,8 +33,7 @@ pub fn main() {
 }
 
 pub struct App {
-    grid_state: grid::State,
-    output_text: String
+    grid_state: grid::State
 }
 
 impl Sandbox for App {
@@ -25,8 +41,7 @@ impl Sandbox for App {
 
     fn new() -> App {
         App {
-            grid_state: grid::State::new(None),
-            output_text: "Edit the grid!".into(),
+            grid_state: grid::State::new(None)
         }
     }
 
@@ -36,7 +51,7 @@ impl Sandbox for App {
 
     fn update(&mut self, event: Message) {
         match event {
-            Message::NewPattern(pattern) => {
+            Message::NewPattern(_pattern) => {
                 // self.output_text = format!("new pattern: {}", pattern.data);
                 // println!("{:?}", pattern.data);
             }
@@ -47,21 +62,21 @@ impl Sandbox for App {
         let grid_widget = grid::Grid::new(
             &mut self.grid_state, 
             Message::NewPattern,
-            Length::from(Length::Units(984)),
-            Length::from(Length::Units(376))
+            Length::from(Length::Units(855)),
+            Length::from(Length::Units(245))
         );
 
         let content: Element<_> = Column::new()
-            .max_width(984)
+            .max_width(855)
             .align_items(Align::Center)
             .push(grid_widget)
-            .push(Text::new(&self.output_text))
             .into();
 
         Container::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
+            .style(MainContainerStyle {}) 
             .into()
     }
 }

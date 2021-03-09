@@ -3,7 +3,7 @@ mod idle;
 pub use idle::Idle;
 
 use std::fmt::Debug;
-use iced_native::{event, keyboard, mouse, Event, Rectangle, Point};
+use iced_native::{keyboard, Rectangle, Point};
 
 use super::WidgetContext;
 
@@ -72,7 +72,7 @@ pub trait WidgetState: Debug {
 
     fn next(
        &mut self,
-       next_state: Box<dyn WidgetState>
+       _next_state: Box<dyn WidgetState>
     ) {}
 }
 

@@ -1,5 +1,5 @@
 use iced_native::{Rectangle, Point, keyboard};
-use crate::core::grid::{GridPattern, GridEvent, get_hovered_step, pad_cursor};
+use crate::core::grid::{GridEvent, get_hovered_step, pad_cursor};
 use super::{WidgetState, Transition, WidgetContext};
 
 #[derive(Debug)]
@@ -188,17 +188,24 @@ impl MovingSelectionQuantized {
 impl WidgetState for MovingSelectionQuantized {
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {  
         // cursor cannot get out of the grid area (container padding excluded)
-        let padded_cursor = pad_cursor(cursor, bounds);
+        // let padded_cursor = pad_cursor(cursor, bounds);
+        // let drag_bounds = Rectangle {
+        //     x: self.origin.x,
+        //     y: self.origin.y,
+        //     width: padded_cursor.x - self.origin.x,
+        //     height: padded_cursor.y - self.origin.y
+        // };
+
         let drag_bounds = Rectangle {
             x: self.origin.x,
             y: self.origin.y,
-            width: padded_cursor.x - self.origin.x,
-            height: padded_cursor.y - self.origin.y
+            width: cursor.x - self.origin.x,
+            height: cursor.y - self.origin.y
         };
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_quantized(bounds, drag_bounds, padded_cursor, self.origin_event);
+        context.output_pattern.move_selection_quantized(bounds, drag_bounds, cursor, self.origin_event);
 
         Transition::DoNothing
     }
@@ -213,6 +220,7 @@ impl WidgetState for MovingSelectionQuantized {
 
     fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, context: &mut WidgetContext) -> Transition {
         // commit ouput pattern changes to base_patern
+        context.output_pattern.clean_negative_offsets();
         context.base_pattern.data = context.output_pattern.data.clone();
 
         Transition::ChangeState(Box::new(Waiting::default()))
@@ -237,17 +245,19 @@ impl MovingSelectionUnquantized {
 impl WidgetState for MovingSelectionUnquantized {
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> Transition {
         // cursor cannot get out of the grid area (container padding excluded)
-        let padded_cursor = pad_cursor(cursor, bounds);
+        // let padded_cursor = pad_cursor(cursor, bounds);
         let drag_bounds = Rectangle {
             x: self.origin.x,
             y: self.origin.y,
-            width: padded_cursor.x - self.origin.x,
-            height: padded_cursor.y - self.origin.y
+            width: cursor.x - self.origin.x,
+            height: cursor.y - self.origin.y
         };
+
+        // println!("unquantized padded_cursor {:?}", cursor);
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, padded_cursor, self.origin_event);
+        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, cursor, self.origin_event);
 
         Transition::DoNothing
     }
@@ -262,6 +272,7 @@ impl WidgetState for MovingSelectionUnquantized {
 
     fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, context: &mut WidgetContext) -> Transition {
         // commit ouput pattern changes to base_patern
+        context.output_pattern.clean_negative_offsets();
         context.base_pattern.data = context.output_pattern.data.clone();
 
         Transition::ChangeState(Box::new(Waiting::default()))
