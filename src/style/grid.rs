@@ -19,24 +19,18 @@ const STEP_BORDER_LEFT_COLOR_2: Color = Color::from_rgba(0.7, 0.7, 0.7, 0.55);
 const STEP_LINE_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
 const STEP_LINE_COLOR_2: Color = Color::from_rgb(0.315, 0.315, 0.315);
 const EVENT_HIGHLIGHT_BG_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const EVENT_BORDER_COLOR: Color = STEP_BORDER_LEFT_COLOR_2;
+const EVENT_BORDER_COLOR: Color = Color::WHITE;
 const EVENT_HIGHLIGHT_BORDER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
 const EVENT_MARKER_COLOR: (Color, Color) = (
-    Color::from_rgb(0.976, 0.973, 0.027), // yellow
-    Color::from_rgb(0., 0.753, 0.039), // green
+    Color::from_rgb(0., 0.7, 0.04), // green
+    Color::from_rgb(0.7, 0., 0.04), // yellow
 );
 const EVENT_HIGHLIGHT_MARKER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
 const EVENT_SELECTED_COLOR: Color = Color::from_rgb(0.894, 0.953, 0.059);
 const EVENT_SELECTED_BORDER_COLOR: Color = Color::from_rgba(0.1, 0.1, 0.1, 1.);
 const EVENT_SELECTED_MARKER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const SELECTION_BORDER_COLOR: Color = Color::from_rgb(0., 0., 0.);
+const SELECTION_BORDER_COLOR: Color = Color::from_rgb(0.8, 0.8, 0.8);
 
-// const EVENT_BG_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-
-// let event_bg_color: HashMap<_, _> = vec![
-//     (0, Color::from_rgb(0.396, 0.153, 0.043)), // purple
-//     (1, Color::from_rgb(0.8, 0., 0.035))
-// ].into_iter().collect();
 
 #[derive(Debug, Clone)]
 pub struct Style {

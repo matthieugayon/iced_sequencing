@@ -15,9 +15,14 @@ pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.05;
 
 pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
+    // return Point {
+    //     x: (point.x - bounds.x).min(bounds.width).max(0.0).ceil(),
+    //     y: (point.y - bounds.y).min(bounds.height).max(0.0).ceil(),
+    // }
+
     return Point {
-        x: (point.x - bounds.x).min(bounds.width).max(0.0).ceil(),
-        y: (point.y - bounds.y).min(bounds.height).max(0.0).ceil(),
+        x: (point.x - bounds.x).ceil(),
+        y: (point.y - bounds.y).ceil(),
     }
 }
 
@@ -36,7 +41,7 @@ pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
 pub fn pad_cursor(point: Point, bounds: Rectangle) -> Point {
     return Point {
         x: point.x.min(bounds.width - CONTAINER_PADDING_LEFT).max(CONTAINER_PADDING_LEFT),
-        y: point.y.min(bounds.height - CONTAINER_PADDING_TOP).max(CONTAINER_PADDING_TOP),
+        y: point.y.min(bounds.height - CONTAINER_PADDING_TOP - TRACK_MARGIN_BOTTOM).max(CONTAINER_PADDING_TOP),
     }
 }
 
@@ -64,6 +69,10 @@ pub fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Opti
             let step = ((cursor.x - CONTAINER_PADDING_LEFT) / step_size.width) as usize;
             let track = ((cursor.y - CONTAINER_PADDING_TOP) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize;
             let offset = (cursor.x - (CONTAINER_PADDING_LEFT + step as f32 * step_size.width)) / step_size.width;
+
+            println!("get_hovered_step step_size.height {:?}", step_size.height);
+            println!("get_hovered_step cursor {:?}", cursor);
+            println!("get_hovered_step track {:?}", track);
 
             Some((step, track, offset))
         } else {
@@ -221,12 +230,20 @@ impl GridPattern {
         let max_positive_offset: f32 = (NUM_STEPS - origin_event.0) as f32 - 1.;
         let min_negative_offset: f32 =  -1. * origin_event.0 as f32 - origin_event.2.offset;
 
-        let mut selection_step_offset = (drag_bounds.width / step_size.width).floor();
+        let mut selection_step_offset = {
+            if drag_bounds.width >= 0. {
+                (drag_bounds.width / step_size.width).floor()
+            } else {
+                (drag_bounds.width / step_size.width).ceil()
+            }
+        };
  
         if origin_event.2.offset != 0. {
             let step_offset = (drag_bounds.width / (step_size.width * 0.5)) as isize;
             let wrapped_offset = step_offset % 2;
             selection_step_offset = step_offset as f32 * 0.5;
+
+            println!("wrapped_offset {:?}", wrapped_offset);
 
             if wrapped_offset != 0 {
                 if origin_event.2.offset < 0. {
@@ -236,6 +253,10 @@ impl GridPattern {
                 }
             }
         }
+
+        println!("drag_bounds.width {:?}", drag_bounds.width);
+        println!("origin_event.2.offset != 0. {:?}", origin_event.2.offset != 0.);
+        println!("selection_step_offset {:?}", selection_step_offset);
 
         self.move_selection(selection_step_offset.min(max_positive_offset).max(min_negative_offset), track_offset);
     }
@@ -466,6 +487,19 @@ impl GridPattern {
             }
         }
     }
+
+    pub fn set_velocity(&mut self, ratio: f32) {
+        self.data.iter_mut().for_each(|(_, event)| {
+            if event.selected {
+                if ratio >= 0. {
+                    event.velocity = (ratio * (1. - event.velocity) + event.velocity).min(1.).max(0.);
+                } else {
+                    let rate = 1.- ratio.max(-1.) * -1.;
+                    event.velocity = rate * event.velocity;
+                }
+            }
+        });
+    }
 }
 
 impl From<Pattern> for GridPattern {
@@ -498,4 +532,9 @@ impl From<GridPattern> for Pattern {
 
       pattern
   }
+}
+
+pub enum GridMessage {
+    NewPattern(Pattern),
+    TrackSelected(usize)
 }

@@ -12,6 +12,7 @@ const WINDOW_BG_COLOR: Color = Color::from_rgb(
     0x22 as f32 / 255.0,
     0x2A as f32 / 255.0, //180b28
 );
+
 pub struct MainContainerStyle;
 
 impl container::StyleSheet for MainContainerStyle {
@@ -62,12 +63,12 @@ impl Sandbox for App {
         let grid_widget = grid::Grid::new(
             &mut self.grid_state, 
             Message::NewPattern,
-            Length::from(Length::Units(855)),
-            Length::from(Length::Units(475))
+            Length::from(Length::Units(690)),
+            Length::from(Length::Units(345))
         );
 
         let content: Element<_> = Column::new()
-            .max_width(855)
+            .max_width(690)
             .align_items(Align::Center)
             .push(grid_widget)
             .into();

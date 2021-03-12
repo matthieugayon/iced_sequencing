@@ -1,11 +1,13 @@
 mod idle;
+mod logo;
 
 pub use idle::Idle;
+pub use logo::Logo;
 
 use std::fmt::Debug;
 use iced_native::{keyboard, Rectangle, Point};
-
 use super::WidgetContext;
+use crate::core::grid::GridMessage;
 
 pub trait WidgetState: Debug {
     fn on_cancelled(&mut self, _context: &mut WidgetContext) {}
@@ -15,8 +17,8 @@ pub trait WidgetState: Debug {
         _bounds: Rectangle,
         _cursor: Point,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_double_click(
@@ -24,8 +26,8 @@ pub trait WidgetState: Debug {
         _bounds: Rectangle,
         _cursor: Point,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_button_release(
@@ -33,8 +35,8 @@ pub trait WidgetState: Debug {
         _bounds: Rectangle,
         _cursor: Point,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_cursor_moved(
@@ -42,32 +44,32 @@ pub trait WidgetState: Debug {
         _bounds: Rectangle,
         _cursor: Point,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_key_pressed(
         &mut self,
         _key_code: keyboard::KeyCode,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_key_released(
         &mut self,
         _key_code: keyboard::KeyCode,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn on_modifier_change(
         &mut self,
         _modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext
-    ) -> Transition {
-        Transition::DoNothing
+    ) -> (Transition, Option<GridMessage>) {
+        (Transition::DoNothing, None)
     }
 
     fn next(
@@ -80,6 +82,7 @@ pub trait WidgetState: Debug {
 #[derive(Debug)]
 pub enum Transition {
     ChangeState(Box<dyn WidgetState>),
+    ChangeParentState(Box<dyn WidgetState>),
     DoNothing,
 }
 

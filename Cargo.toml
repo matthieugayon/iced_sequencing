@@ -21,3 +21,4 @@ iced_graphics = { version = "0.1", features = ["canvas"] }
 ganic-no-std = { path = "../ganic_rs-workspace/ganic-no-std" }
 itertools = "0.9.0"
 colors-transform = "0.2.5"
+palette="0.5.0"

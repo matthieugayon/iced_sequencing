@@ -12,6 +12,7 @@ use crate::core::grid::{
 
 pub use crate::native::grid::State;
 pub use crate::style::grid::{Style, StyleSheet};
+pub use crate::style::color::{lighten,darken};
 
 use ganic_no_std::{NUM_PERCS, NUM_STEPS};
 
@@ -27,6 +28,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         _cursor_position: Point,
         grid_pattern: GridPattern,
         selection: Option<Rectangle>,
+        mouse_interaction: mouse::Interaction,
         style_sheet: &Self::Style
     ) -> Self::Output {
 
@@ -56,7 +58,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
             Primitive::Group {
                 primitives
             },
-            mouse::Interaction::default(),
+            mouse_interaction,
         )
     }
 }
@@ -193,11 +195,29 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size, sty
                             width: step_size.width - 6.,
                             height: step_size.height - 6.,
                         },
-                        background: Background::Color(*style.event_bg_color.get(track).unwrap()),
+                        background: Background::Color(lighten(*style.event_bg_color.get(track).unwrap(), 0.2)),
                         border_radius: 0.,
                         border_width: 1.,
                         border_color: Color::WHITE
+                    });
+
+                    let slider_inner_height = step_size.height - 8.;
+                    let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+                    let velocity_top_offset = slider_inner_height - velocity_height;
+
+                    primitives.push(Primitive::Quad {
+                        bounds: Rectangle{
+                            x: event_position.x + bounds.x + 4.,
+                            y: event_offset_y + bounds.y + 4. + velocity_top_offset,
+                            width: step_size.width - 8.,
+                            height: velocity_height,
+                        },
+                        background: Background::Color(*style.event_bg_color.get(track).unwrap()),
+                        border_radius: 0.,
+                        border_width: 0.,
+                        border_color: Color::TRANSPARENT
                     })
+
                 } else {
                     primitives.push(Primitive::Quad {
                         bounds: Rectangle{
@@ -206,10 +226,27 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size, sty
                             width: step_size.width,
                             height: step_size.height,
                         },
-                        background: Background::Color(*style.event_bg_color.get(track).unwrap()),
+                        background: Background::Color(lighten(*style.event_bg_color.get(track).unwrap(), 0.2)),
                         border_radius: 0.,
                         border_width: 1.,
                         border_color: style.event_border_color
+                    });
+
+                    let slider_inner_height = step_size.height - 2.;
+                    let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+                    let velocity_top_offset = slider_inner_height - velocity_height;
+
+                    primitives.push(Primitive::Quad {
+                        bounds: Rectangle{
+                            x: event_position.x + bounds.x + 1.,
+                            y: event_offset_y + bounds.y + 1. + velocity_top_offset,
+                            width: step_size.width - 2.,
+                            height: velocity_height,
+                        },
+                        background: Background::Color(*style.event_bg_color.get(track).unwrap()),
+                        border_radius: 0.,
+                        border_width: 0.,
+                        border_color: Color::TRANSPARENT
                     })
                 }
 
@@ -219,7 +256,7 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size, sty
                             x: 1. + step_position.x + bounds.x,
                             y: event_offset_y + bounds.y + step_size.height,
                             width: event_position.x - step_position.x - 1.,
-                            height: 1.,
+                            height: 2.,
                         },
                         background:  Background::Color(style.event_marker_color.0),
                         border_radius: 0.0,
@@ -232,7 +269,7 @@ fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size, sty
                             x: event_position.x + bounds.x,
                             y: event_offset_y + bounds.y + step_size.height,
                             width: step_position.x - event_position.x,
-                            height: 1.,
+                            height: 2.,
                         },
                         background: Background::Color(style.event_marker_color.1),
                         border_radius: 0.0,

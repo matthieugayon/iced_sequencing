@@ -10,17 +10,16 @@ use std::hash::Hash;
 use ganic_no_std::{pattern::Pattern};
 
 use crate::core::grid::{
-    GridPattern, normalize_point
+    GridPattern, normalize_point, GridMessage
 }; 
 
 pub mod modes;
 
 use modes::{WidgetState, Transition, Idle};
 
-
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
     state: &'a mut State,
-    _on_change: Box<dyn Fn(Pattern) -> Message>,
+    on_change: Box<dyn Fn(Pattern) -> Message>,
     width: Length,
     height: Length,
     style: Renderer::Style
@@ -38,7 +37,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     {
         Grid {
             state,
-            _on_change: Box::new(on_change),
+            on_change: Box::new(on_change),
             width,
             height,
             style: Renderer::Style::default()
@@ -59,6 +58,42 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self.style = style.into();
         self
     }
+
+    fn handle_event<F>(&mut self, handler: F, messages: &mut Vec<Message>)
+        where F: FnOnce(&mut dyn WidgetState, &mut WidgetContext) -> (Transition, Option<GridMessage>),
+    {
+        let (transition, message) = handler(
+            &mut *self.state.current_state,
+            &mut self.state.context
+        );
+
+        self.handle_transition(transition);
+
+        match message {
+            Some(grid_message) => {
+                match grid_message {
+                    GridMessage::NewPattern(pattern) => {
+                        messages.push((self.on_change)(pattern))
+                    }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
+    }
+
+    fn handle_transition(&mut self, transition: Transition) {
+        match transition {
+            Transition::ChangeState(new_state) => {
+                println!("Changing state {:?} => {:?}",
+                    self.state.current_state,
+                    new_state
+                );
+                self.state.current_state = new_state
+            },
+            _ => {}
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,7 +101,8 @@ pub struct WidgetContext {
     // base pattern we use as a base (sometimes modifications are not applied, ex: when you drag and press Escape)
     base_pattern: GridPattern,
     output_pattern: GridPattern,
-    selection_rectangle: Option<Rectangle>
+    selection_rectangle: Option<Rectangle>,
+    mouse_interaction: mouse::Interaction
 }
 
 #[derive(Debug)]
@@ -95,32 +131,9 @@ impl State {
                 base_pattern: base_pattern.clone(),
                 output_pattern: base_pattern.clone(),
                 selection_rectangle: None,
+                mouse_interaction: mouse::Interaction::default()
             },
             last_click: None
-        }
-    }
-
-    fn handle_event<F>(&mut self, handler: F)
-        where F: FnOnce(&mut dyn WidgetState, &mut WidgetContext) -> Transition,
-    {
-        let transition = handler(
-            &mut *self.current_state,
-            &mut self.context
-        );
-
-        self.handle_transition(transition);
-    }
-
-    fn handle_transition(&mut self, transition: Transition) {
-        match transition {
-            Transition::ChangeState(new_state) => {
-                println!("Changing state {:?} => {:?}",
-                    self.current_state,
-                    new_state
-                );
-                self.current_state = new_state
-            },
-            Transition::DoNothing => {},
         }
     }
 }
@@ -155,7 +168,7 @@ where
         event: Event,
         layout: Layout<'_>,
         cursor_position: Point,
-        _messages: &mut Vec<Message>,
+        messages: &mut Vec<Message>,
         _renderer: &Renderer,
         _clipboard: Option<&dyn Clipboard>,
     ) -> event::Status {
@@ -181,13 +194,13 @@ where
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
-                    self.state.handle_event(|widget_state, context| {
+                    self.handle_event(|widget_state, context| {
                         widget_state.on_cursor_moved(
                             normalized_bounds,
                             normalized_cursor_position,
                             context
                         )
-                    });
+                    }, messages);
 
                     return event::Status::Captured;
                 }
@@ -200,41 +213,39 @@ where
 
                         match click.kind() {
                             mouse::click::Kind::Single => {
-                                self.state.handle_event(|widget_state, context| {
+                                self.handle_event(|widget_state, context| {
                                     widget_state.on_click(
                                         normalized_bounds,
                                         normalized_cursor_position,
                                         context
                                     )
-                                });
+                                }, messages);
                             },
                             mouse::click::Kind::Double => {
-                                self.state.handle_event(|widget_state, context| {
+                                self.handle_event(|widget_state, context| {
                                     widget_state.on_double_click(
                                         normalized_bounds,
                                         normalized_cursor_position,
                                         context
                                     )
-                                });
+                                }, messages);
                             },
                             _ => {}
                         }
 
                         self.state.last_click = Some(click);
 
-                        // messages.push((self.on_change)(Pattern::from(self.state.output_pattern.to_owned())));
-
                         return event::Status::Captured;
                     }
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                    self.state.handle_event(|widget_state, context| {
+                    self.handle_event(|widget_state, context| {
                         widget_state.on_button_release(
                             normalized_bounds,
                             normalized_cursor_position,
                             context
                         )
-                    });
+                    }, messages);
 
                     return event::Status::Captured;
                 }
@@ -242,32 +253,32 @@ where
             },
             Event::Keyboard(keyboard_event) => match keyboard_event {
                 keyboard::Event::KeyPressed { key_code, .. } => {
-                    self.state.handle_event(|widget_state, context| {
+                    self.handle_event(|widget_state, context| {
                         widget_state.on_key_pressed(
                             key_code,
                             context
                         )
-                    });
+                    }, messages);
 
                     return event::Status::Captured;
                 } 
                 keyboard::Event::KeyReleased { key_code, .. } => {
-                    self.state.handle_event(|widget_state, context| {
+                    self.handle_event(|widget_state, context| {
                         widget_state.on_key_released(
                             key_code,
                             context
                         )
-                    });
+                    }, messages);
 
                     return event::Status::Captured;
                 }            
                 keyboard::Event::ModifiersChanged(modifiers) => {
-                    self.state.handle_event(|widget_state, context| {
+                    self.handle_event(|widget_state, context| {
                         widget_state.on_modifier_change(
                             modifiers,
                             context
                         )
-                    });
+                    }, messages);
 
                     return event::Status::Captured;
                 }
@@ -292,6 +303,7 @@ where
             cursor_position,
             self.state.context.output_pattern.to_owned(),
             self.state.context.selection_rectangle,
+            self.state.context.mouse_interaction,
             &self.style
         )
     }
@@ -314,6 +326,7 @@ pub trait Renderer: iced_native::Renderer {
         cursor_position: Point,
         grid_pattern: GridPattern,
         selection: Option<Rectangle>,
+        mouse_interaction: mouse::Interaction,
         style: &Self::Style
     ) -> Self::Output;
 }
