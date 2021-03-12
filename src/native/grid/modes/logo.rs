@@ -1,6 +1,13 @@
 use iced_native::{Rectangle, Point, keyboard, mouse};
 use ganic_no_std::{pattern::Pattern};
-use crate::core::grid::{GridEvent, get_hovered_step, pad_cursor, GridMessage, DEFAULT_VELOCITY};
+use crate::core::grid::{
+    GridEvent,
+    is_point_inside_clickable_area,
+    get_hovered_step,
+    pad_cursor,
+    GridMessage,
+    DEFAULT_VELOCITY
+};
 use super::{WidgetState, Transition, WidgetContext, Idle};
 
 #[derive(Debug)]
@@ -49,11 +56,20 @@ impl WidgetState for Logo {
         (Transition::DoNothing, None)
     }
 
-    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if !modifiers.logo {
-            (Transition::ChangeState(Box::new(Idle::default())), None)
-        } else {
-            (Transition::DoNothing, None)
+    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
+        let transition: Transition = self.nested.on_modifier_change(modifiers, context).0;
+
+        match transition {
+            Transition::ChangeState(new_state) => {
+                self.next(new_state);
+                return (Transition::DoNothing, None)
+            }
+            Transition::ChangeParentState(new_state) => {
+                return (Transition::ChangeState(new_state), None)
+            }
+            Transition::DoNothing => {
+                return (Transition::DoNothing, None)
+            }
         }
     }
 
@@ -85,6 +101,14 @@ impl Default for Logo {
     }
 }
 
+impl Logo {
+    pub fn selecting(point: Point) -> Logo {
+        Logo {
+            nested: Box::new(Selecting::from_args(point))
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct Waiting;
 
@@ -98,16 +122,18 @@ impl WidgetState for Waiting {
         match context.base_pattern.clone().get_hovered(padded_cursor, bounds) {
             // otherwise add event
             None => {
-                match get_hovered_step(cursor, bounds, false) {
-                    Some((step, track, offset)) => {
-                        context.base_pattern.data.insert((step, track), GridEvent {
-                            offset,
-                            velocity: DEFAULT_VELOCITY,
-                            selected: true
-                        });
-                    }
-                    None => {
-
+                if is_point_inside_clickable_area(cursor, bounds) {
+                    match get_hovered_step(cursor, bounds) {
+                        Some((step, track, offset)) => {
+                            context.base_pattern.data.insert((step, track), GridEvent {
+                                offset,
+                                velocity: DEFAULT_VELOCITY,
+                                selected: true
+                            });
+                        }
+                        None => {
+    
+                        }
                     }
                 }
             }
@@ -157,17 +183,20 @@ impl WidgetState for Waiting {
 
     fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
         match key_code {
+            keyboard::KeyCode::A => {
+                context.base_pattern.select_all();
+            }
             keyboard::KeyCode::Backspace => {
                 context.base_pattern.remove_selection();
             }
             keyboard::KeyCode::Left => {
-                context.base_pattern.move_selection(-0.1, 0);
+                context.base_pattern.move_selection(-0.05, 0);
             }
             keyboard::KeyCode::Up => {
                 context.base_pattern.move_selection(0., -1);
             }
             keyboard::KeyCode::Right => {
-                context.base_pattern.move_selection(0.1, 0);
+                context.base_pattern.move_selection(0.05, 0);
             }
             keyboard::KeyCode::Down => {
                 context.base_pattern.move_selection(0., 1);
@@ -179,6 +208,15 @@ impl WidgetState for Waiting {
         context.output_pattern = context.base_pattern.clone();
 
         (Transition::DoNothing, None)
+    }
+
+    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
+        if !modifiers.logo {
+            context.mouse_interaction = mouse::Interaction::default();
+            (Transition::ChangeParentState(Box::new(Idle::default())), None)
+        } else {
+            (Transition::DoNothing, None)
+        }
     }
 }
 
@@ -224,6 +262,14 @@ impl WidgetState for Selecting {
 
         (Transition::ChangeState(Box::new(Waiting::default())), None)
     }
+
+    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
+        if !modifiers.logo {
+            (Transition::ChangeParentState(Box::new(Idle::selecting(self.origin))), None)
+        } else {
+            (Transition::DoNothing, None)
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -254,6 +300,15 @@ impl WidgetState for SetVelocity {
         context.mouse_interaction = mouse::Interaction::default();
 
         (Transition::ChangeState(Box::new(Waiting::default())), None)
+    }
+
+    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
+        if !modifiers.logo {
+            context.mouse_interaction = mouse::Interaction::default();
+            (Transition::ChangeParentState(Box::new(Idle::default())), None)
+        } else {
+            (Transition::DoNothing, None)
+        }
     }
 }
 

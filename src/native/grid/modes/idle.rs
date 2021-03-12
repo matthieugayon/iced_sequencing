@@ -1,13 +1,15 @@
-use iced_native::{Rectangle, Point, keyboard};
-use ganic_no_std::{pattern::Pattern};
+use iced_native::{Rectangle, Point, keyboard, mouse};
+use ganic_no_std::pattern::Pattern;
 use crate::core::grid::{
     GridEvent,
+    is_point_inside_clickable_area,
     get_hovered_step,
     pad_cursor,
     GridMessage
 };
 use super::{WidgetState, Transition, WidgetContext};
 use super::Logo;
+use super::Shift;
 
 #[derive(Debug)]
 pub struct Idle {
@@ -102,6 +104,14 @@ impl Default for Idle {
     }
 }
 
+impl Idle {
+    pub fn selecting(point: Point) -> Idle {
+        Idle {
+            nested: Box::new(Selecting::from_args(point))
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct Waiting;
 
@@ -119,11 +129,13 @@ impl WidgetState for Waiting {
             }
             // otherwise add event
             None => {
-                match get_hovered_step(cursor, bounds, false) {
-                    Some((step, track, ..)) => {
-                        context.base_pattern.data.insert((step, track), GridEvent::default());
+                if is_point_inside_clickable_area(cursor, bounds) {
+                    match get_hovered_step(cursor, bounds) {
+                        Some((step, track, ..)) => {
+                            context.base_pattern.data.insert((step, track), GridEvent::default());
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
             }
         }
@@ -145,6 +157,8 @@ impl WidgetState for Waiting {
                     context.output_pattern = context.base_pattern.clone();
                 }
 
+                context.mouse_interaction = mouse::Interaction::Grab;
+
                 (Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(cursor, (step, track, grid_event)))), None)
             }
             // otherwise add event
@@ -155,16 +169,18 @@ impl WidgetState for Waiting {
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if modifiers.logo {
-            (Transition::ChangeParentState(Box::new(Logo::default())), None)
-        } else {
-            (Transition::DoNothing, None)
+        match modifiers {
+            keyboard::Modifiers { logo: true, .. } => {
+                (Transition::ChangeParentState(Box::new(Logo::default())), None)
+            },
+            keyboard::Modifiers { logo: false, shift: true, .. } => {
+                (Transition::ChangeParentState(Box::new(Shift::default())), None)
+            }
+            _ => { (Transition::DoNothing, None) }
         }
     }
 
     fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        println!("on_key_pressed {:?}", key_code);
-
         match key_code {
             keyboard::KeyCode::Backspace => {
                 context.base_pattern.remove_selection();
@@ -258,15 +274,6 @@ impl MovingSelectionQuantized {
 
 impl WidgetState for MovingSelectionQuantized {
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {  
-        // cursor cannot get out of the grid area (container padding excluded)
-        // let padded_cursor = pad_cursor(cursor, bounds);
-        // let drag_bounds = Rectangle {
-        //     x: self.origin.x,
-        //     y: self.origin.y,
-        //     width: padded_cursor.x - self.origin.x,
-        //     height: padded_cursor.y - self.origin.y
-        // };
-
         let drag_bounds = Rectangle {
             x: self.origin.x,
             y: self.origin.y,
@@ -293,6 +300,8 @@ impl WidgetState for MovingSelectionQuantized {
         // commit ouput pattern changes to base_patern
         context.output_pattern.clean_negative_offsets();
         context.base_pattern.data = context.output_pattern.data.clone();
+
+        context.mouse_interaction = mouse::Interaction::default();
 
         (Transition::ChangeState(Box::new(Waiting::default())), None)
     }
@@ -324,8 +333,6 @@ impl WidgetState for MovingSelectionUnquantized {
             height: cursor.y - self.origin.y
         };
 
-        // println!("unquantized padded_cursor {:?}", cursor);
-
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
         context.output_pattern.move_selection_unquantized(bounds, drag_bounds, cursor, self.origin_event);
@@ -345,6 +352,8 @@ impl WidgetState for MovingSelectionUnquantized {
         // commit ouput pattern changes to base_patern
         context.output_pattern.clean_negative_offsets();
         context.base_pattern.data = context.output_pattern.data.clone();
+
+        context.mouse_interaction = mouse::Interaction::default();
 
         (Transition::ChangeState(Box::new(Waiting::default())), None)
     }

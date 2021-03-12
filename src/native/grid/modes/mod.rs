@@ -1,8 +1,10 @@
 mod idle;
 mod logo;
+mod shift;
 
 pub use idle::Idle;
 pub use logo::Logo;
+pub use shift::Shift;
 
 use std::fmt::Debug;
 use iced_native::{keyboard, Rectangle, Point};

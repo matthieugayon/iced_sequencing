@@ -15,15 +15,23 @@ pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.05;
 
 pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
-    // return Point {
-    //     x: (point.x - bounds.x).min(bounds.width).max(0.0).ceil(),
-    //     y: (point.y - bounds.y).min(bounds.height).max(0.0).ceil(),
-    // }
-
-    return Point {
+    Point {
         x: (point.x - bounds.x).ceil(),
         y: (point.y - bounds.y).ceil(),
     }
+}
+
+pub fn is_point_inside_clickable_area(point: Point, bounds: Rectangle) -> bool {
+    let step_size = get_step_dimensions(bounds);
+
+    let clickable_area = Rectangle {
+        x: CONTAINER_PADDING_LEFT,
+        y: CONTAINER_PADDING_TOP,
+        width: bounds.width - CONTAINER_PADDING_LEFT - step_size.width,
+        height: bounds.height - CONTAINER_PADDING_TOP - TRACK_MARGIN_BOTTOM
+    };
+    
+    clickable_area.contains(point)
 }
 
 pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
@@ -34,14 +42,14 @@ pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
         height: bounds.height - CONTAINER_PADDING_TOP
     };
     
-    return draggable_area.contains(point)
+    draggable_area.contains(point)
 }
 
 // cursor and bounds are normalized normalized
 pub fn pad_cursor(point: Point, bounds: Rectangle) -> Point {
     return Point {
-        x: point.x.min(bounds.width - CONTAINER_PADDING_LEFT).max(CONTAINER_PADDING_LEFT),
-        y: point.y.min(bounds.height - CONTAINER_PADDING_TOP - TRACK_MARGIN_BOTTOM).max(CONTAINER_PADDING_TOP),
+        x: point.x.min(bounds.width).max(CONTAINER_PADDING_LEFT),
+        y: point.y.min(bounds.height - TRACK_MARGIN_BOTTOM).max(CONTAINER_PADDING_TOP),
     }
 }
 
@@ -56,35 +64,19 @@ pub fn get_event_absolute_position(step: usize, track: usize, offset: f32, bound
   let step_size = get_step_dimensions(bounds);
 
   return Point {
-      x: CONTAINER_PADDING_LEFT + (offset * step_size.width) + step as f32 * step_size.width,
-      y: CONTAINER_PADDING_TOP + track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)
+      x: (CONTAINER_PADDING_LEFT + (offset * step_size.width) + step as f32 * step_size.width).ceil(),
+      y: (CONTAINER_PADDING_TOP + track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)).ceil()
   }
 }
 
-pub fn get_hovered_step(cursor: Point, bounds: Rectangle, bounded: bool) -> Option<(usize, usize, f32)> {
+pub fn get_hovered_step(cursor: Point, bounds: Rectangle) -> Option<(usize, usize, f32)> {
     let step_size = get_step_dimensions(bounds);
     
-    if bounded {
-        if is_point_inside_draggable_area(cursor, bounds) {
-            let step = ((cursor.x - CONTAINER_PADDING_LEFT) / step_size.width) as usize;
-            let track = ((cursor.y - CONTAINER_PADDING_TOP) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize;
-            let offset = (cursor.x - (CONTAINER_PADDING_LEFT + step as f32 * step_size.width)) / step_size.width;
+    let step = (((cursor.x - CONTAINER_PADDING_LEFT) / step_size.width) as usize).max(0).min(NUM_STEPS - 1);
+    let track = (((cursor.y - CONTAINER_PADDING_TOP) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS - 1);
+    let offset = ((cursor.x - (CONTAINER_PADDING_LEFT + step as f32 * step_size.width)) / step_size.width).max(-0.99).min(0.99);
 
-            println!("get_hovered_step step_size.height {:?}", step_size.height);
-            println!("get_hovered_step cursor {:?}", cursor);
-            println!("get_hovered_step track {:?}", track);
-
-            Some((step, track, offset))
-        } else {
-            None
-        }
-    } else {
-        let step = (((cursor.x - CONTAINER_PADDING_LEFT) / step_size.width) as usize).max(0).min(NUM_STEPS - 1);
-        let track = (((cursor.y - CONTAINER_PADDING_TOP) / (step_size.height + TRACK_MARGIN_BOTTOM)) as usize).max(0).min(NUM_PERCS - 1);
-        let offset = ((cursor.x - (CONTAINER_PADDING_LEFT + step as f32 * step_size.width)) / step_size.width).max(-0.99).min(0.99);
-
-        Some((step, track, offset))
-    }
+    Some((step, track, offset))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -155,6 +147,13 @@ impl GridPattern {
         }
     }
 
+    pub fn select_all(&mut self) {
+        // add event
+        self.data.iter_mut().for_each(|(_, grid)| {
+            grid.selected = true;
+        });
+    }
+
     pub fn select_one(&mut self, grid_id: (usize, usize)) {
         self.data.iter_mut().for_each(|((step, track), grid)| {
             if *step == grid_id.0 && *track == grid_id.1 {
@@ -184,6 +183,27 @@ impl GridPattern {
                 None => {
                     grid_event.selected = false;
                 }
+            }
+        });
+    }
+
+    pub fn toggle_area(&mut self, selection: Rectangle, bounds: Rectangle) {
+        let step_size = get_step_dimensions(bounds);
+        self.data.iter_mut().for_each(|((step, track), grid_event)| {
+            let event_origin = get_event_absolute_position(*step, *track, grid_event.offset, bounds);
+
+            let event_bounds = Rectangle {
+                x: event_origin.x,
+                y: event_origin.y,
+                width: step_size.width,
+                height: step_size.height,
+            };
+
+            match selection.intersection(&event_bounds) {
+                Some(_) => {
+                    grid_event.selected = !grid_event.selected;
+                }
+                _ => {}
             }
         });
     }
@@ -224,7 +244,7 @@ impl GridPattern {
         // so it must be hovering a step
         // let step_offset: isize = hovered_step.0 as isize - origin_grid_id.0 as isize;
         let step_size = get_step_dimensions(bounds);
-        let hovered_step = get_hovered_step(cursor, bounds, false).unwrap();
+        let hovered_step = get_hovered_step(cursor, bounds).unwrap();
         let track_offset: isize = hovered_step.1 as isize - origin_event.1 as isize;
 
         let max_positive_offset: f32 = (NUM_STEPS - origin_event.0) as f32 - 1.;
@@ -243,8 +263,6 @@ impl GridPattern {
             let wrapped_offset = step_offset % 2;
             selection_step_offset = step_offset as f32 * 0.5;
 
-            println!("wrapped_offset {:?}", wrapped_offset);
-
             if wrapped_offset != 0 {
                 if origin_event.2.offset < 0. {
                     selection_step_offset = (step_offset as f32 * 0.5).floor() + (-1. * origin_event.2.offset);
@@ -253,10 +271,6 @@ impl GridPattern {
                 }
             }
         }
-
-        println!("drag_bounds.width {:?}", drag_bounds.width);
-        println!("origin_event.2.offset != 0. {:?}", origin_event.2.offset != 0.);
-        println!("selection_step_offset {:?}", selection_step_offset);
 
         self.move_selection(selection_step_offset.min(max_positive_offset).max(min_negative_offset), track_offset);
     }
@@ -272,7 +286,7 @@ impl GridPattern {
         let min_negative_offset: f32 =  -1. * origin_event.0 as f32 - origin_event.2.offset;
         let step_size = get_step_dimensions(bounds);
         let step_offset = (drag_bounds.width / step_size.width).min(max_positive_offset).max(min_negative_offset);
-        let hovered_step = get_hovered_step(cursor, bounds, false).unwrap();
+        let hovered_step = get_hovered_step(cursor, bounds).unwrap();
         let track_offset: isize = hovered_step.1 as isize - origin_event.1 as isize;
 
         self.move_selection(step_offset, track_offset);
@@ -470,7 +484,8 @@ impl GridPattern {
             }) {
 
             if event.offset < 0. {
-                let previous_step = (step - 1 + NUM_STEPS) % NUM_STEPS;
+                // let previous_step = (step - 1 + NUM_STEPS) % NUM_STEPS;
+                let previous_step = step.checked_sub(1).unwrap_or(NUM_STEPS - 1);
                 let previous_event = self.data.get(&(previous_step, track));
 
                 match previous_event {

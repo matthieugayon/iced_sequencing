@@ -7,7 +7,7 @@ use iced_native::{
 
 use std::hash::Hash;
 
-use ganic_no_std::{pattern::Pattern};
+use ganic_no_std::{pattern::Pattern, NUM_PERCS};
 
 use crate::core::grid::{
     GridPattern, normalize_point, GridMessage
@@ -59,6 +59,11 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self
     }
 
+    pub fn is_playing(mut self, is_playing: bool, highlight: [usize; NUM_PERCS]) {
+        self.state.is_playing = is_playing;
+        self.state.highlight = highlight;
+    }
+
     fn handle_event<F>(&mut self, handler: F, messages: &mut Vec<Message>)
         where F: FnOnce(&mut dyn WidgetState, &mut WidgetContext) -> (Transition, Option<GridMessage>),
     {
@@ -85,10 +90,10 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     fn handle_transition(&mut self, transition: Transition) {
         match transition {
             Transition::ChangeState(new_state) => {
-                println!("Changing state {:?} => {:?}",
-                    self.state.current_state,
-                    new_state
-                );
+                // println!("Changing state {:?} => {:?}",
+                //     self.state.current_state,
+                //     new_state
+                // );
                 self.state.current_state = new_state
             },
             _ => {}
@@ -109,7 +114,9 @@ pub struct WidgetContext {
 pub struct State {
     current_state: Box<dyn WidgetState>, // state machine state
     context: WidgetContext, // context we'll mutate in our state machine
-    last_click: Option<mouse::Click>
+    last_click: Option<mouse::Click>,
+    highlight: [usize; NUM_PERCS],
+    is_playing: bool
 }
 
 impl State {
@@ -133,7 +140,9 @@ impl State {
                 selection_rectangle: None,
                 mouse_interaction: mouse::Interaction::default()
             },
-            last_click: None
+            last_click: None,
+            highlight: [0; NUM_PERCS],
+            is_playing: false
         }
     }
 }
@@ -304,6 +313,8 @@ where
             self.state.context.output_pattern.to_owned(),
             self.state.context.selection_rectangle,
             self.state.context.mouse_interaction,
+            self.state.is_playing,
+            self.state.highlight,
             &self.style
         )
     }
@@ -327,6 +338,8 @@ pub trait Renderer: iced_native::Renderer {
         grid_pattern: GridPattern,
         selection: Option<Rectangle>,
         mouse_interaction: mouse::Interaction,
+        is_playing: bool,
+        highlight: [usize; NUM_PERCS],
         style: &Self::Style
     ) -> Self::Output;
 }
