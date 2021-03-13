@@ -204,7 +204,7 @@ impl WidgetState for Waiting {
         // replicate base pattern to drawing pattern
         context.output_pattern = context.base_pattern.clone();
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, Some(GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))))
     }
 }
 
