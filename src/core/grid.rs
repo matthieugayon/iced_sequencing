@@ -239,7 +239,7 @@ impl GridPattern {
         drag_bounds: Rectangle,
         cursor: Point,
         origin_event: (usize, usize, GridEvent)
-    ) {
+    ) -> bool {
         // cursor is normalized and padded, it cannto be outside
         // so it must be hovering a step
         // let step_offset: isize = hovered_step.0 as isize - origin_grid_id.0 as isize;
@@ -273,6 +273,8 @@ impl GridPattern {
         }
 
         self.move_selection(selection_step_offset.min(max_positive_offset).max(min_negative_offset), track_offset);
+
+        track_offset != 0 || selection_step_offset != 0.
     }
 
     pub fn move_selection_unquantized(
@@ -524,7 +526,7 @@ impl From<Pattern> for GridPattern {
       for (i, step) in pattern.iter().enumerate() {
           for (j, perc) in step.iter().enumerate() {
               if perc[0] > 0.0 {
-                  grid.data.insert((i, j), GridEvent { velocity: perc[0], offset: perc[1], selected: false });
+                  grid.data.insert((i, (NUM_PERCS - 1) - j), GridEvent { velocity: perc[0], offset: perc[1], selected: false });
               }
           }
       }
@@ -541,14 +543,15 @@ impl From<GridPattern> for Pattern {
 
 
       for ((step, track), event) in grid.data {
-          pattern.data[step][track][0] = event.velocity;
-          pattern.data[step][track][1] = event.offset;
+          pattern.data[step][(NUM_PERCS - 1) - track][0] = event.velocity;
+          pattern.data[step][(NUM_PERCS - 1) - track][1] = event.offset;
       }
 
       pattern
   }
 }
 
+#[derive(Debug)]
 pub enum GridMessage {
     NewPattern(Pattern),
     TrackSelected(usize)

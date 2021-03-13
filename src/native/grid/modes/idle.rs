@@ -18,43 +18,44 @@ pub struct Idle {
 
 impl WidgetState for Idle {
     fn on_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_click(bounds, cursor, context).0
+        let (next_transition, message) = self.nested.on_click(bounds, cursor, context);
+        
+        if let Transition::ChangeState(new_state) = next_transition
         {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_double_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_double_click(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_double_click(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition{
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_button_release(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_button_release(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_button_release(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_cursor_moved(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_cursor_moved(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
@@ -75,13 +76,13 @@ impl WidgetState for Idle {
     }
 
     fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_key_pressed(key_code, context).0
-        {
+        let (next_transition, message) = self.nested.on_key_pressed(key_code, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState>) {
@@ -283,9 +284,14 @@ impl WidgetState for MovingSelectionQuantized {
 
         // set and mutate output pattern
         context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_quantized(bounds, drag_bounds, cursor, self.origin_event);
+        // debounce a bit
+        let has_moved = context.output_pattern.move_selection_quantized(bounds, drag_bounds, cursor, self.origin_event); 
+        
+        if has_moved {
+            return (Transition::DoNothing, Some(GridMessage::NewPattern(Pattern::from(context.output_pattern.clone())))) 
+        }
 
-        (Transition::DoNothing, Some(GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))))
+        (Transition::DoNothing, None)
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
@@ -333,11 +339,16 @@ impl WidgetState for MovingSelectionUnquantized {
             height: cursor.y - self.origin.y
         };
 
-        // set and mutate output pattern
-        context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.move_selection_unquantized(bounds, drag_bounds, cursor, self.origin_event);
+        // debounce a bit
+        if drag_bounds.width.abs() >= 1. || drag_bounds.height.abs() >= 1. {
+            // set and mutate output pattern
+            context.output_pattern = context.base_pattern.clone();
+            context.output_pattern.move_selection_unquantized(bounds, drag_bounds, cursor, self.origin_event);
 
-        (Transition::DoNothing, Some(GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))))
+            return (Transition::DoNothing, Some(GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))))
+        }
+
+        (Transition::DoNothing, None)
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {

@@ -17,43 +17,43 @@ pub struct Logo {
 
 impl WidgetState for Logo {
     fn on_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_click(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_click(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_double_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_double_click(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_double_click(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_button_release(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_button_release(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_button_release(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_cursor_moved(bounds, cursor, context).0
-        {
+        let (next_transition, message) = self.nested.on_cursor_moved(bounds, cursor, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
@@ -74,13 +74,13 @@ impl WidgetState for Logo {
     }
 
     fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<GridMessage>) {
-        if let Transition::ChangeState(new_state) =
-            self.nested.on_key_pressed(key_code, context).0
-        {
+        let (next_transition, message) = self.nested.on_key_pressed(key_code, context);
+
+        if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
 
-        (Transition::DoNothing, None)
+        (Transition::DoNothing, message)
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState>) {

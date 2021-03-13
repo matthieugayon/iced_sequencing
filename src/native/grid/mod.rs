@@ -59,11 +59,6 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self
     }
 
-    pub fn is_playing(mut self, is_playing: bool, highlight: [usize; NUM_PERCS]) {
-        self.state.is_playing = is_playing;
-        self.state.highlight = highlight;
-    }
-
     fn handle_event<F>(&mut self, handler: F, messages: &mut Vec<Message>)
         where F: FnOnce(&mut dyn WidgetState, &mut WidgetContext) -> (Transition, Option<GridMessage>),
     {
@@ -144,6 +139,19 @@ impl State {
             highlight: [0; NUM_PERCS],
             is_playing: false
         }
+    }
+
+    pub fn new_pattern(&mut self, pattern: Pattern) {
+        self.context.base_pattern = GridPattern::from(pattern);
+        self.context.output_pattern = self.context.base_pattern.clone();
+    }
+
+    pub fn is_playing(&mut self, is_playing: bool) {
+        self.is_playing = is_playing;
+    }
+
+    pub fn transport(&mut self, highlight: [usize; NUM_PERCS]) {
+        self.highlight = highlight;
     }
 }
 
