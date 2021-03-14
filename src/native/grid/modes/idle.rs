@@ -13,7 +13,7 @@ use super::Shift;
 
 #[derive(Debug)]
 pub struct Idle {
-    nested: Box<dyn WidgetState>,
+    nested: Box<dyn WidgetState + Send>,
 }
 
 impl WidgetState for Idle {
@@ -85,7 +85,7 @@ impl WidgetState for Idle {
         (Transition::DoNothing, message)
     }
 
-    fn next(&mut self, next_state: Box<dyn WidgetState>) {
+    fn next(&mut self, next_state: Box<dyn WidgetState + Send>) {
         // println!("Idle: changing sub state {:?} => {:?}",
         //     self.nested,
         //     next_state

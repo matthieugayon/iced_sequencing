@@ -76,15 +76,15 @@ pub trait WidgetState: Debug {
 
     fn next(
        &mut self,
-       _next_state: Box<dyn WidgetState>
+       _next_state: Box<dyn WidgetState + Send>
     ) {}
 }
 
 
 #[derive(Debug)]
 pub enum Transition {
-    ChangeState(Box<dyn WidgetState>),
-    ChangeParentState(Box<dyn WidgetState>),
+    ChangeState(Box<dyn WidgetState + Send>),
+    ChangeParentState(Box<dyn WidgetState + Send>),
     DoNothing,
 }
 

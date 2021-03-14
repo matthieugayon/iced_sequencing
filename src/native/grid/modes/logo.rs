@@ -12,7 +12,7 @@ use super::{WidgetState, Transition, WidgetContext, Idle};
 
 #[derive(Debug)]
 pub struct Logo {
-    nested: Box<dyn WidgetState>,
+    nested: Box<dyn WidgetState + Send>,
 }
 
 impl WidgetState for Logo {
@@ -83,7 +83,7 @@ impl WidgetState for Logo {
         (Transition::DoNothing, message)
     }
 
-    fn next(&mut self, next_state: Box<dyn WidgetState>) {
+    fn next(&mut self, next_state: Box<dyn WidgetState + Send>) {
         // println!("Idle: changing sub state {:?} => {:?}",
         //     self.nested,
         //     next_state

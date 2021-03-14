@@ -107,7 +107,7 @@ pub struct WidgetContext {
 
 #[derive(Debug)]
 pub struct State {
-    current_state: Box<dyn WidgetState>, // state machine state
+    current_state: Box<dyn WidgetState + Send>, // state machine state
     context: WidgetContext, // context we'll mutate in our state machine
     last_click: Option<mouse::Click>,
     highlight: [usize; NUM_PERCS],
@@ -150,8 +150,15 @@ impl State {
         self.is_playing = is_playing;
     }
 
-    pub fn transport(&mut self, highlight: [usize; NUM_PERCS]) {
-        self.highlight = highlight;
+    pub fn transport(&mut self, highlight: [Option<usize>; NUM_PERCS]) {
+        for (pidx, option_step) in highlight.iter().enumerate() {
+            match option_step {
+                Some(step) => {
+                    self.highlight[pidx] = *step
+                }
+                None => {}
+            }
+        }
     }
 }
 

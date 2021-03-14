@@ -8,8 +8,8 @@ use iced_native::{
 use ganic_no_std::{NUM_PERCS, NUM_STEPS, pattern::Pattern};
 
 pub const TRACK_MARGIN_BOTTOM: f32 = 3.0;
-pub const CONTAINER_PADDING_TOP: f32 = 15.;
-pub const CONTAINER_PADDING_LEFT: f32 = 30.;
+pub const CONTAINER_PADDING_TOP: f32 = 0.;
+pub const CONTAINER_PADDING_LEFT: f32 = 0.;
 
 pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.05;
