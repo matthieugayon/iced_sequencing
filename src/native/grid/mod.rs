@@ -154,7 +154,7 @@ impl State {
         for (pidx, option_step) in highlight.iter().enumerate() {
             match option_step {
                 Some(step) => {
-                    self.highlight[pidx] = *step
+                    self.highlight[NUM_PERCS - pidx - 1] = *step
                 }
                 None => {}
             }
