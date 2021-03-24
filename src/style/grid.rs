@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use iced_native::Color;
 
 use super::hex::from_hex;
-use super::color::{lighten};
+use super::color::lighten;
 
 
 fn hex(hex_str: &str) -> Color {

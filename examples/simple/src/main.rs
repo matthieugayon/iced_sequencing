@@ -4,7 +4,7 @@ use iced::{
     Settings, Color, container
 };
 // Import iced_audio modules.
-use iced_sequencing::grid;
+use iced_sequencing::{grid, snapshot};
 use ganic_no_std::pattern::Pattern;
 
 const WINDOW_BG_COLOR: Color = Color::from_rgb(
@@ -67,10 +67,17 @@ impl Sandbox for App {
             Length::from(Length::Units(345))
         );
 
+        let snapshot_test = snapshot::Snapshot::new(
+            Some(Pattern::new_test()),
+            Length::from(Length::Units(130)),
+            Length::from(Length::Units(85))
+        );
+
         let content: Element<_> = Column::new()
             .max_width(690)
             .align_items(Align::Center)
             .push(grid_widget)
+            .push(snapshot_test)
             .into();
 
         Container::new(content)

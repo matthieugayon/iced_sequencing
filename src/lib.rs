@@ -7,10 +7,16 @@ pub mod core;
 mod platform {
     #[doc(no_inline)]
     pub use crate::graphics::grid;
+    pub use crate::graphics::snapshot;
+
 
     #[doc(no_inline)]
     pub use {
         grid::Grid
+    };
+
+    pub use {
+        snapshot::Snapshot
     };
 }
 
