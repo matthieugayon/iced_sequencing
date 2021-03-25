@@ -134,23 +134,33 @@ where
 
         let style: Style = if self.selected { self.style.default() } else { self.style.selected() };
 
+        let mut primitives: Vec<Primitive> = events.iter().map(|(step, track, grid_event)| {
+            Primitive::Quad {
+                bounds: Rectangle{
+                    x: bounds.x + offset_x + ((*step as f32 + grid_event.offset) * step_dim.width).floor(),
+                    y: bounds.y + offset_y + *track as f32 * step_dim.height,
+                    width: step_dim.width,
+                    height: step_dim.height
+                },
+                background: Background::Color(style.step_color),
+                border_radius: 0.,
+                border_width: 0.,
+                border_color: Color::TRANSPARENT
+            }
+        }).collect();
+
+        primitives.push(
+            Primitive::Quad {
+                bounds,
+                background: Background::Color(Color::TRANSPARENT),
+                border_radius: 0.,
+                border_width: 1.,
+                border_color: Color::WHITE
+            }
+        );
+
         (
-            Primitive::Group {
-                primitives: events.iter().map(|(step, track, grid_event)| {
-                    Primitive::Quad {
-                        bounds: Rectangle{
-                            x: bounds.x + offset_x + ((*step as f32 + grid_event.offset) * step_dim.width).floor(),
-                            y: bounds.y + offset_y + *track as f32 * step_dim.height,
-                            width: step_dim.width,
-                            height: step_dim.height
-                        },
-                        background: Background::Color(style.step_color),
-                        border_radius: 0.,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    }
-                }).collect()
-            },
+            Primitive::Group { primitives },
             mouse::Interaction::default(),
         )
     }
