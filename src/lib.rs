@@ -7,19 +7,16 @@ pub mod core;
 mod platform {
     #[doc(no_inline)]
     pub use crate::graphics::grid;
-
-    #[doc(no_inline)]
-    pub use {
-        grid::Grid
-    };
-
-    #[doc(no_inline)]
+    pub use crate::graphics::snapshot;
+    pub use crate::graphics::h_list;
     pub use crate::graphics::multi_slider;
 
+
     #[doc(no_inline)]
-    pub use {
-        multi_slider::MultiSlider
-    };
+    pub use grid::Grid;
+    pub use snapshot::Snapshot;
+    pub use h_list::HList;
+    pub use multi_slider::MultiSlider;
 }
 
 #[doc(no_inline)]

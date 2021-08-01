@@ -1,78 +1,142 @@
-use iced_native::{Widget, Length, layout, Size, event, Event, mouse, Point, Layout, Clipboard, Color, Element, Rectangle, Hasher};
+use iced_native::{
+    Widget, Length, layout, Size, event, 
+    Event, mouse, Point, Layout, Clipboard, 
+    Element, Rectangle, Hasher, Color, touch, Padding
+};
+use std::{hash::Hash, ops::RangeInclusive};
 
-use std::hash::Hash;
-use crate::core::grid::normalize_point;
-
-/// A vertical [`MultiSlider`] GUI widget.
-///
-/// [`MultiSlider`]: struct.MultiSlider.html
-pub struct MultiSlider<'a, Message> {
+#[allow(missing_debug_implementations)]
+pub struct MultiSlider<'a, T, Message, Renderer: self::Renderer> {
     state: &'a mut State,
-    on_change: Box<dyn Fn(Vec<f32>) -> Message>,
-    width: u16,
-    height: u16,
-    sliders: Vec<Slider>,
-    background_color: Color
+    values: Vec<T>,
+    range: RangeInclusive<T>,
+    step: T,
+    active: Option<usize>,
+    on_change: Box<dyn Fn(Vec<T>) -> Message>,
+    on_release: Option<Message>,
+    width: Length,
+    height: Length,
+    spacing: u16,
+    padding: Padding,
+    base_color: Color,
+    style: Renderer::Style
 }
 
-impl<'a, Message> MultiSlider<'a, Message> {
-    /// Creates a new [`MultiSlider`].
-    ///
-    /// It expects:
-    /// * a multi_slider [`State`] with its initial parameters
-    /// * a on_change function
-    /// * a width as an integer
-    /// * a height as an integer
-    /// * a number_of_sliders as an integer
-    /// * a background_color
-    ///
-    /// [`State`]: struct.State.html
-    /// [`MultiSlider`]: struct.MultiSlider.html
+impl<'a, T, Message, Renderer> MultiSlider<'a, T, Message, Renderer>
+where
+    T: Copy + From<u8> + std::cmp::PartialOrd,
+    Message: Clone,
+    Renderer: self::Renderer,
+{
     pub fn new<F>(
         state: &'a mut State,
+        range: RangeInclusive<T>,
+        values: Vec<T>,
         on_change: F,
-        width: u16,
-        height: u16,
-        number_of_sliders: u16,
-        background_color: Color
+        base_color: Color
     ) -> Self
-        where
-            F: 'static + Fn(Vec<f32>) -> Message,
+    where
+        F: 'static + Fn(Vec<T>) -> Message
     {
+        let slider_values: Vec<T> = values.into_iter()
+            .map(|value| {
+                if value >= *range.start() && value <= *range.end() {
+                    value
+                } else if value <= *range.start() {
+                    *range.start()
+                } else {
+                    *range.end()
+                }
+            })
+            .collect();
+
         MultiSlider {
             state,
+            values: slider_values,
+            range,
+            step: T::from(1),
+            active: None,
             on_change: Box::new(on_change),
-            width,
-            height,
-            sliders: Self::generate_sliders(
-                number_of_sliders, width, height
-            ),
-            background_color
+            on_release: None,
+            width: Length::Fill,
+            height: Length::Fill,
+            spacing: 0,
+            padding: Padding::ZERO,
+            base_color,
+            style: Renderer::Style::default()
         }
     }
 
-    fn generate_sliders(
-        number_of_sliders: u16,
-        window_width: u16,
-        window_height: u16
-    ) -> Vec<Slider> {
-        let mut sliders: Vec<Slider> = Vec::new();
-        for index in 0..number_of_sliders {
-            sliders.push(Slider::new(
-                window_width,
-                window_height,
-                number_of_sliders,
-                index
-            ));
-        }
-        sliders
+    pub fn width(mut self, width: Length) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn height(mut self, height: Length) -> Self {
+        self.height = height;
+        self
+    }
+
+    pub fn spacing(mut self, units: u16) -> Self {
+        self.spacing = units;
+        self
+    }
+
+    pub fn padding<P: Into<Padding>>(mut self, padding: P) -> Self {
+        self.padding = padding.into();
+        self
+    }
+
+    pub fn on_release(mut self, on_release: Message) -> Self {
+        self.on_release = Some(on_release);
+        self
+    }
+
+    pub fn number_of_sliders(mut self, number_of_sliders: u16) -> Self {
+        // match let sliders = self.state.values.len() {
+        //     number_of_sliders > sliders {
+
+        //     }
+        // }
+        // self.number_of_sliders = number_of_sliders;
+        self
+    }
+
+    pub fn style(mut self, style: impl Into<Renderer::Style>) -> Self {
+        self.style = style.into();
+        self
+    }
+
+    pub fn step(mut self, step: T) -> Self {
+        self.step = step;
+        self
+    }
+
+    pub fn active(mut self, active: Option<usize>) -> Self {
+        self.active = active;
+        self
     }
 }
 
-impl<'a, Message, Renderer> Widget<Message, Renderer>
-for MultiSlider<'a, Message>
-    where
-        Renderer: self::Renderer,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct State {
+    is_dragging: bool,
+}
+
+impl State {
+    /// Creates a new [`State`].
+    pub fn new() -> State {
+        State::default()
+    }
+}
+
+
+impl<'a, T, Message, Renderer> Widget<Message, Renderer>
+    for MultiSlider<'a, T, Message, Renderer>
+where
+    T: Copy + Into<f64> + num_traits::FromPrimitive,
+    Message: Clone,
+    Renderer: self::Renderer,
 {
     fn width(&self) -> Length {
         Length::Shrink
@@ -89,11 +153,18 @@ for MultiSlider<'a, Message>
     ) -> layout::Node {
         let limits = limits
             .width(Length::from(self.width))
-            .height(Length::from(self.height));
+            .height(Length::from(self.height))
+            .pad(self.padding);
 
-        let size = limits.resolve(Size::ZERO);
+        let mut content = layout::Node::new(limits.resolve(Size::ZERO));
+        content.move_to(Point::new(
+            self.padding.left.into(),
+            self.padding.top.into(),
+        ));
 
-        layout::Node::new(size)
+        let size = limits.resolve(content.size()).pad(self.padding);
+
+        layout::Node::with_children(size, vec![content])
     }
 
     fn on_event(
@@ -101,43 +172,85 @@ for MultiSlider<'a, Message>
         event: Event,
         layout: Layout<'_>,
         cursor_position: Point,
-        _messages: &mut Vec<Message>,
         _renderer: &Renderer,
-        _clipboard: Option<&dyn Clipboard>,
+        _clipboard: &mut dyn Clipboard,
+        messages: &mut Vec<Message>,
     ) -> event::Status {
-        let bounds = layout.bounds();
-        let normalized_cursor_position = normalize_point(cursor_position, bounds);
+        let content_bounds = layout.children().next().unwrap().bounds();
+        let slider_width = (content_bounds.width / self.values.len() as f32).floor();
+
+        let mut change = || -> () {
+            let slider_index = {
+                if cursor_position.x >= content_bounds.x + content_bounds.width {
+                    self.values.len() - 1
+                } else if cursor_position.x >= content_bounds.x {
+                    ((cursor_position.x - content_bounds.x) / slider_width) as usize
+                } else {
+                    0
+                }
+            };
+
+            let changed_value: Option<T> = {
+                if cursor_position.y >= content_bounds.y + content_bounds.height {
+                    Some(*self.range.start())
+                } else if cursor_position.y <= content_bounds.y {
+                    Some(*self.range.end())
+                } else {
+                    let step = self.step.into();
+                    let start = (*self.range.start()).into();
+                    let end = (*self.range.end()).into();
+                    let percent = f64::from(content_bounds.y + content_bounds.height - cursor_position.y)
+                        / f64::from(content_bounds.height);
+
+                    let steps = (percent * (end - start) / step).round();
+                    let value = steps * step + start;
+
+                    T::from_f64(value)
+                }
+            };
+
+
+            match changed_value {
+                Some(value) => {
+                    let mut values: Vec<T> = self.values.clone();
+                    values[slider_index] = value;
+                    messages.push((self.on_change)(values));
+                },
+                _ => {},
+            }
+        };
 
         match event {
-            Event::Mouse(mouse_event) => match mouse_event {
-                mouse::Event::ButtonPressed(_click) => {
-                    self.state.clicked = self.state.focused;
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                if layout.bounds().contains(cursor_position) {
+                    change();
+                    self.state.is_dragging = true;
+
+                    return event::Status::Captured;
                 }
-                mouse::Event::ButtonReleased(_click) => {
-                    self.state.clicked = false;
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerLifted { .. })
+            | Event::Touch(touch::Event::FingerLost { .. }) => {
+                if self.state.is_dragging {
+                    if let Some(on_release) = self.on_release.clone() {
+                        messages.push(on_release);
+                    }
+                    self.state.is_dragging = false;
+
+                    return event::Status::Captured;
                 }
-                mouse::Event::CursorMoved{ .. } => {
-                    self.state.focused = cursor_position.x < bounds.x + bounds.width &&
-                        cursor_position.x > bounds.x &&
-                        cursor_position.y > bounds.y &&
-                        cursor_position.y < bounds.y + bounds.height
+            }
+            Event::Mouse(mouse::Event::CursorMoved { .. })
+            | Event::Touch(touch::Event::FingerMoved { .. }) => {
+                if self.state.is_dragging {
+                    change();
+
+                    return event::Status::Captured;
                 }
-                _ => {}
             }
             _ => {}
-        }
-
-        for slider in &mut self.sliders {
-            slider.update(
-                bounds,
-                normalized_cursor_position,
-                self.state.clicked
-            );
-            /*self.state.values[slider.index as usize] = slider.value;*/
-        }
-
-        if self.state.clicked && self.state.focused {
-            /*messages.push((self.on_change)(self.state.values));*/
         }
 
         event::Status::Ignored
@@ -148,14 +261,29 @@ for MultiSlider<'a, Message>
         renderer: &mut Renderer,
         _defaults: &Renderer::Defaults,
         layout: Layout<'_>,
-        _cursor_position: Point,
+        cursor_position: Point,
         _viewport: &Rectangle,
     ) -> Renderer::Output {
+        let content_bounds = layout.children().next().unwrap().bounds();
+        let start = *self.range.start();
+        let end = *self.range.end();
+        let values: Vec<f32> = self.values.iter()
+            .map(|&value| {
+                value.into() as f32
+            })
+            .collect();
+
         renderer.draw(
             layout.bounds(),
-            self.background_color,
-            &self.sliders,
-            self.state.focused
+            content_bounds,
+            cursor_position,
+            start.into() as f32..=end.into() as f32,
+            values,
+            self.active,
+            self.state.is_dragging,
+            self.spacing,
+            self.base_color,
+            &self.style,
         )
     }
 
@@ -165,136 +293,39 @@ for MultiSlider<'a, Message>
 
         self.width.hash(state);
         self.height.hash(state);
+        self.padding.hash(state);
     }
 }
 
-
-/// The local state of a [`MultiSlider`].
-///
-/// It knows when the widget has been clicked and when it is focused.
-///
-/// It also stores the current values of all the [`Slider`].
-///
-/// [`MultiSlider`]: struct.MultiSlider.html
-/// [`Slider`]: struct.Slider.html
-#[derive(Debug, Clone)]
-pub struct State {
-    clicked: bool,
-    focused: bool,
-    values: Vec<f32>
-}
-
-impl State {
-    /// Creates a new [`MultiSlider`] state.
-    ///
-    /// [`MultiSlider`]: struct.MultiSlider.html
-    pub fn new(initial_values: Vec<f32>) -> Self {
-        Self {
-            clicked: false,
-            focused: false,
-            values: initial_values
-        }
-    }
-}
-
-/// The renderer of a [`MultiSlider`].
-///
-/// [`MultiSlider`]: struct.MultiSlider.html
 pub trait Renderer: iced_native::Renderer {
-    /// Draws a [`MultiSlider`].
-    ///
-    /// It receives:
-    ///   * the bounds of the [`MultiSlider`]
-    ///   * the background_color of the [`MultiSlider`]
-    ///   * a vector of [`Slider`] composing the [`MultiSlider`]
-    ///   * the focused state of the [`MultiSlider`]
-    ///
-    /// [`MultiSlider`]: struct.MultiSlider.html
-    /// [`Slider`]: struct.Slider.html
+    type Style: Default;
+
     fn draw(
         &mut self,
         bounds: Rectangle,
-        background_color: Color,
-        sliders: &Vec<Slider>,
-        focused: bool
+        content_bounds: Rectangle,
+        cursor_position: Point,
+        range: RangeInclusive<f32>,
+        values: Vec<f32>,
+        active: Option<usize>,
+        is_dragging: bool,
+        spacing: u16,
+        base_color: Color,
+        style: &Self::Style
     ) -> Self::Output;
 }
 
-impl<'a, Message, Renderer> From<MultiSlider<'a, Message>>
-for Element<'a, Message, Renderer>
-    where
-        Renderer: 'a + self::Renderer,
-        Message: 'a,
+
+impl<'a, T, Message, Renderer> From<MultiSlider<'a, T, Message, Renderer>>
+    for Element<'a, Message, Renderer>
+where
+    T: 'a + Copy + Into<f64> + num_traits::FromPrimitive,
+    Message: 'a + Clone,
+    Renderer: 'a + self::Renderer,
 {
     fn from(
-        multi_slider: MultiSlider<'a, Message>,
+        multi_slider: MultiSlider<'a, T, Message, Renderer>,
     ) -> Element<'a, Message, Renderer> {
         Element::new(multi_slider)
-    }
-}
-
-/// The [`Slider`] of a [`MultiSlider`].
-///
-/// It handles a value scaled between 0.0 and 1.0 reflecting the slider range.
-/// 
-/// [`Slider`]: struct.Slider.html
-/// [`MultiSlider`]: struct.MultiSlider.html
-#[derive(Debug, Clone)]
-pub struct Slider {
-    pub origin: Point,
-    pub size: Size,
-    bounds: (f32, f32),
-    index: u16,
-    value: f32,
-    pub hovered: bool
-}
-
-impl Slider {
-    pub fn new(
-        widget_width: u16,
-        widget_height: u16,
-        number_of_sliders: u16,
-        index: u16
-    ) -> Slider {
-        let slider_width = widget_width / number_of_sliders;
-        let slider_height = 0;
-
-        let origin = Point::new((slider_width * index) as f32, widget_height as f32);
-        let size = Size::new(slider_width as f32, slider_height as f32);
-
-        Slider {
-            origin,
-            size,
-            bounds: (origin.x, origin.x + size.width),
-            index,
-            value: 0.0,
-            hovered: false
-        }
-    }
-
-    /// A [`Slider`] will update itself according to the user's actions.
-    ///
-    /// It will change if hovered and if the user is clicking (and moving).
-    ///
-    /// It receives:
-    ///   * the bounds of the [`MultiSlider`]
-    ///   * the mouse_position in the [`MultiSlider`]
-    ///   * the clicked state of the [`MultiSlider`]
-    ///
-    /// [`Slider`]: struct.Slider.html
-    /// [`MultiSlider`]: struct.MultiSlider.html
-    pub fn update(
-        &mut self,
-        bounds: Rectangle,
-        mouse_position: Point,
-        is_widget_clicked: bool
-    ) {
-        self.hovered = mouse_position.x > self.bounds.0 &&
-            mouse_position.x < self.bounds.1;
-
-        if self.hovered && is_widget_clicked {
-            self.size.height = mouse_position.y - bounds.height;
-            self.value = (self.size.height / bounds.height).abs();
-        }
     }
 }
