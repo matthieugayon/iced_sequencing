@@ -1,11 +1,7 @@
 // Import iced modules.
-use iced::{
-    Sandbox, Settings, container, 
-    Element, Color, Column, Align,
-    Container, Length, button, Button,
-    Text
-};
+use iced::{Align, Button, Color, Column, Container, Element, Length, Point, Row, Sandbox, Settings, Text, button, container};
 
+use iced_native::{Overlay, Renderer, overlay};
 // Import iced_audio sequencing.
 use iced_sequencing::{grid, snapshot, h_list, multi_slider};
 use iced_sequencing::style::color_utils::hex;
@@ -35,7 +31,8 @@ pub enum Message {
     Dragged(h_list::DragEvent),
     Clicked(usize),
     SetVelocities(Vec<f32>),
-    AddSnapshotPressed
+    AddSnapshotPressed,
+    Delete(usize)
 }
 
 pub fn main() {
@@ -46,7 +43,7 @@ pub struct App {
     add_snapshot_button: button::State,
     grid_state: grid::State,
     multi_slider: multi_slider::State,
-    snapshot_list: h_list::State<Option<Pattern>>,
+    snapshot_list: h_list::State<Item>,
     current_snapshot: usize,
     focused_track: usize
 }
@@ -55,12 +52,13 @@ impl Sandbox for App {
     type Message = Message;
 
     fn new() -> App {
-        let test_pattern = Some(Pattern::new_test());
+        let test = Item::new(None);
+
         App {
             add_snapshot_button: button::State::new(),
-            grid_state: grid::State::new(test_pattern),
+            grid_state: grid::State::new(test.data),
             multi_slider: multi_slider::State::new(),
-            snapshot_list: h_list::State::new(vec![test_pattern]),
+            snapshot_list: h_list::State::new(vec![test]),
             current_snapshot: 0,
             focused_track: 0
         }
@@ -74,10 +72,10 @@ impl Sandbox for App {
         match event {
             Message::SetPattern(pattern) => {
                 // update snapshot list 
-                self.snapshot_list.replace(self.current_snapshot, Some(pattern));
+                self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
             }
             Message::SetVelocities(values) => {
-                let mut current_snapshot = self.snapshot_list.get_mut(self.current_snapshot).unwrap().unwrap();                
+                let mut current_snapshot = self.snapshot_list.get_mut(self.current_snapshot).unwrap().data.unwrap();                
                 values.into_iter()
                     .enumerate()
                     .for_each(|(step, vel)| {
@@ -85,7 +83,7 @@ impl Sandbox for App {
                     });
 
                 // update snapshot list state
-                self.snapshot_list.replace(self.current_snapshot, Some(current_snapshot));
+                self.snapshot_list.replace(self.current_snapshot, Item::new(Some(current_snapshot)));
 
                 // update grid state
                 self.grid_state.new_pattern(current_snapshot);
@@ -101,19 +99,55 @@ impl Sandbox for App {
                 self.current_snapshot = index;
 
                 // update grid state
-                let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().unwrap();
+                let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
                 self.grid_state.new_pattern(current_snapshot);
             }
             Message::FocusTrack(track) => {
                 self.focused_track = track;
             },
             Message::AddSnapshotPressed => {
-                self.snapshot_list.push(Some(Pattern::new_test()))
+                self.snapshot_list.push(Item::new(Some(Pattern::new_test())))
+            },
+            Message::Delete(snapshot_index) => {
+
             },
         }
     }
 
     fn view(&mut self) -> Element<Message> {
+        let current_velocities = self.snapshot_list.get(self.current_snapshot)
+            .unwrap()
+            .data
+            .unwrap()
+            .velocities(self.focused_track)
+            .to_vec();
+
+        let number_of_snapshots = self.snapshot_list.len(); 
+        let current_snapshot = self.current_snapshot;
+        
+        let list = h_list::HList::new(&mut self.snapshot_list, |pane_index, pane| {
+                // let title = Container::new();
+
+                // let title_bar = h_list::TitleBar::new(title)
+                //     .controls(pane.controls.view(pane_index, number_of_snapshots));
+                    
+                let is_focused = current_snapshot == pane_index;
+                let snapshot = snapshot::Snapshot::new(
+                        pane.data,
+                        Length::Fill,
+                        Length::Fill
+                    )
+                    .select(is_focused)
+                    .controls(pane.controls.view(pane_index, number_of_snapshots));
+                
+                h_list::Content::new(snapshot)
+            })
+            .width(Length::Fill)
+            .height(Length::from(Length::Units(50)))
+            .spacing(0)
+            .on_click(Message::Clicked)
+            .on_drag(Message::Dragged);
+
         let grid = grid::Grid::new(
             &mut self.grid_state, 
             Message::SetPattern,
@@ -121,12 +155,6 @@ impl Sandbox for App {
             Length::from(Length::Units(690)),
             Length::from(Length::Units(345))
         );
-
-        let current_velocities = self.snapshot_list.get(self.current_snapshot)
-            .unwrap()
-            .unwrap()
-            .velocities(self.focused_track)
-            .to_vec();
 
         let multi_slider = multi_slider::MultiSlider::new(
                 &mut self.multi_slider,
@@ -138,21 +166,6 @@ impl Sandbox for App {
             .spacing(2)
             .height(Length::from(Length::Units(120)))
             .step(0.01);
-        
-        let list = h_list::HList::new(&mut self.snapshot_list, |pane| {
-                let snapshot = snapshot::Snapshot::new(
-                    *pane,
-                    Length::Fill,
-                    Length::Fill
-                );
-                
-                h_list::Content::new(snapshot)
-            })
-            .width(Length::Fill)
-            .height(Length::from(Length::Units(50)))
-            .spacing(0)
-            .on_click(Message::Clicked)
-            .on_drag(Message::Dragged);
 
         let content: Element<_> = Column::new()
             .max_width(690)
@@ -173,5 +186,56 @@ impl Sandbox for App {
             .center_x()
             .center_y()
             .into()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Item {
+    pub data: Option<Pattern>,
+    pub controls: Controls,
+}
+
+#[derive(Debug, Clone)]
+struct Controls {
+    close: button::State,
+}
+
+impl Item {
+    fn new(pattern: Option<Pattern>) -> Self {
+        let data = match pattern {
+            Some(patt) => {
+                Some(patt)
+            },
+            None => {
+                Some(Pattern::new_test())
+            },
+        };
+
+        Self {
+            data,
+            controls: Controls::new()
+        }
+    }
+}
+
+impl Controls {
+    fn new() -> Self {
+        Self {
+            close: button::State::new(),
+        }
+    }
+
+    pub fn view(
+        &mut self,
+        snapshot_index: usize,
+        number_of_items: usize
+    ) -> Element<Message> {
+        let mut button =
+            Button::new(&mut self.close, Text::new("Close").size(14))
+                .padding(3);
+        if number_of_items > 1 {
+            button = button.on_press(Message::Delete(snapshot_index));
+        }
+        button.into()
     }
 }

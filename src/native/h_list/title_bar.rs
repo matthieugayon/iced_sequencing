@@ -1,6 +1,6 @@
 use super::super::h_list;
 use iced_native::{
-    container, event, Event, layout, Padding,
+    container, event, Event, layout, Padding, overlay,
     Clipboard, Element, Hasher, Layout, Point, Rectangle, Size
 };
 
@@ -61,9 +61,6 @@ impl<'a, Message, Renderer> TitleBar<'a, Message, Renderer>
 where
     Renderer: h_list::Renderer,
 {
-    /// Draws the [`TitleBar`] with the provided [`Renderer`] and [`Layout`].
-    ///
-    /// [`Renderer`]: crate::widget::pane_grid::Renderer
     pub fn draw(
         &self,
         renderer: &mut Renderer,
@@ -102,10 +99,6 @@ where
         )
     }
 
-    /// Returns whether the mouse cursor is over the pick area of the
-    /// [`TitleBar`] or not.
-    ///
-    /// The whole [`TitleBar`] is a pick area, except its controls.
     pub fn is_over_pick_area(
         &self,
         layout: Layout<'_>,
@@ -211,5 +204,28 @@ where
         } else {
             event::Status::Ignored
         }
+    }
+
+    pub(crate) fn overlay(
+        &mut self,
+        layout: Layout<'_>,
+    ) -> Option<overlay::Element<'_, Message, Renderer>> {
+        let mut children = layout.children();
+        let padded = children.next()?;
+
+        let mut children = padded.children();
+        let title_layout = children.next()?;
+
+        let Self {
+            content, controls, ..
+        } = self;
+
+        content.overlay(title_layout).or_else(move || {
+            controls.as_mut().and_then(|controls| {
+                let controls_layout = children.next()?;
+
+                controls.overlay(controls_layout)
+            })
+        })
     }
 }

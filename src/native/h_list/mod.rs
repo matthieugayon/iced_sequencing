@@ -37,13 +37,14 @@ where
     /// [`State`].
     pub fn new<T>(
         state: &'a mut State<T>,
-        view: impl Fn(&'a mut T) -> Content<'a, Message, Renderer>,
+        view: impl Fn(usize, &'a mut T) -> Content<'a, Message, Renderer>,
     ) -> Self {
         let elements = {
             state
                 .panes
                 .iter_mut()
-                .map(|pane_state| view(pane_state))
+                .enumerate()
+                .map(|(pane_index, pane_state)| view(pane_index, pane_state))
                 .collect()
         };
 
@@ -278,24 +279,26 @@ where
             _ => {}
         }
 
-        if self.state.picked_pane().is_none() {
-            self.elements
-                .iter_mut()
-                .zip(layout.children())
-                .map(|(pane, layout)| {
-                    pane.on_event(
-                        event.clone(),
-                        layout,
-                        cursor_position,
-                        renderer,
-                        clipboard,
-                        messages,
-                    )
-                })
-                .fold(event_status, event::Status::merge)
-        } else {
-            event::Status::Captured
-        }
+        let picked_pane = self.state.picked_pane().map(|(pane, _)| pane);
+
+        self.elements
+            .iter_mut()
+            .enumerate()
+            .zip(layout.children())
+            .map(|((index, content), layout)| {
+                let is_picked = picked_pane == Some(index);
+
+                content.on_event(
+                    event.clone(),
+                    layout,
+                    cursor_position,
+                    renderer,
+                    clipboard,
+                    messages,
+                    is_picked,
+                )
+            })
+            .fold(event_status, event::Status::merge)
     }
 
     fn draw(
