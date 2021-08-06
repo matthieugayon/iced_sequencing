@@ -119,27 +119,25 @@ where
         limits: &layout::Limits,
     ) -> layout::Node {
         let limits = limits.width(self.width).height(self.height).pad(self.padding);
-        let max_size = limits.max();
         let size = limits.resolve(Size::ZERO);
-        let snapshot_layout = layout::Node::new(size);
 
         let mut node = if let Some(controls) = &self.controls {
             let mut controls_layout = controls
-                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+                .layout(renderer, &layout::Limits::new(Size::ZERO, size));
 
             let controls_size = controls_layout.size();
-            let space_before_controls = max_size.width - controls_size.width;
+            let space_before_controls = size.width - controls_size.width;
 
             controls_layout.move_to(Point::new(space_before_controls, 0.0));
 
             layout::Node::with_children(
-                Size::new(max_size.width, size.height),
-                vec![snapshot_layout, controls_layout],
+                size,
+                vec![controls_layout],
             )  
         } else {
             layout::Node::with_children(
-                Size::new(max_size.width, size.height),
-                vec![snapshot_layout],
+                size,
+                Vec::new(),
             )
         };     
         
@@ -171,13 +169,12 @@ where
     ) -> Renderer::Output {
         let mut children = layout.children();
         let padded = children.next().unwrap();
-
         let mut children = padded.children();
-        let snapshot_layout = children.next().unwrap();
+        // let snapshot_layout = children.next().unwrap();
 
         let controls = if let Some(controls) = &self.controls {
             let controls_layout = children.next().unwrap();
-            let show_controls = snapshot_layout.bounds().contains(cursor_position);
+            let show_controls = padded.bounds().contains(cursor_position);
 
             if show_controls || self.always_show_controls {
                 Some((controls, controls_layout))
@@ -189,7 +186,7 @@ where
         };
 
         renderer.draw(
-            layout.bounds(),
+            padded.bounds(),
             self.pattern.clone(),
             self.selected,
             &self.style,
@@ -213,7 +210,7 @@ where
 
         let mut children = padded.children();
         // snapshot layout
-        children.next();
+        // children.next();
 
         if let Some(controls) = &mut self.controls {
             let controls_layout = children.next().unwrap();
@@ -240,7 +237,7 @@ where
 
         let mut children = padded.children();
         // snapshot layout
-        children.next();
+        // children.next();
 
         let Self { controls, .. } = self;
 

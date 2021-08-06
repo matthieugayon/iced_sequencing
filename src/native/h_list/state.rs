@@ -1,4 +1,4 @@
-use iced_native::{Point, Rectangle, Size};
+use iced_native::Point;
 
 #[derive(Debug, Clone)]
 pub struct State<T> {
@@ -47,6 +47,10 @@ impl<T> State<T> where T: Clone {
     pub fn push(&mut self, pattern: T) {
         self.panes.push(pattern);
     }
+
+    pub fn remove(&mut self, index: usize) {
+        self.panes.remove(index);
+    }
 }
 #[derive(Debug, Clone)]
 pub struct Internal {
@@ -78,20 +82,4 @@ impl Internal {
     pub fn idle(&mut self) {
         self.action = Action::Idle;
     }
-
-    pub fn get_pane_region(pane: usize, base: Size, number_of_panes: usize, spacing: f32) -> Rectangle {
-      let area_width = base.width / number_of_panes as f32;
-
-      Rectangle {
-        x: (pane as f32 * area_width + spacing).round(),
-        y: 0.,
-        width: area_width - 2. * spacing,
-        height: base.height - 2. * spacing
-      }
-    }
-
-    // pub fn hash_layout(&self, hasher: &mut Hasher) {
-    //     use std::hash::Hash;
-    //     self.layout.hash(hasher);
-    // }
 }

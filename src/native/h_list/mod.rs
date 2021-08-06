@@ -210,8 +210,8 @@ where
                 let region = Rectangle {
                   x: ((pane as f32 * area_width) + self.spacing as f32).round(),
                   y: 0.,
-                  width: area_width - 2. * self.spacing as f32,
-                  height: size.height - 2. * self.spacing as f32
+                  width: area_width.round() - 2. * self.spacing as f32,
+                  height: size.height
                 }; 
 
                 let size = Size::new(region.width, region.height);
@@ -239,49 +239,9 @@ where
     ) -> event::Status {
         let mut event_status = event::Status::Ignored;
 
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let bounds = layout.bounds();
-
-                if bounds.contains(cursor_position) {
-                    event_status = event::Status::Captured;
-                    self.click_pane(layout, cursor_position, messages);
-                }
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                if let Some((pane, _)) = self.state.picked_pane() {
-                    if let Some(on_drag) = &self.on_drag {
-                        let mut dropped_region =
-                            self.elements.iter().enumerate().zip(layout.children()).filter(
-                                |(_, layout)| {
-                                    layout.bounds().contains(cursor_position)
-                                },
-                            );
-
-                        let event = match dropped_region.next() {
-                            Some(((target,_), _)) if pane != target => {
-                                DragEvent::Dropped {
-                                    pane,
-                                    target
-                                }
-                            }
-                            _ => DragEvent::Canceled { pane },
-                        };
-
-                        messages.push(on_drag(event));
-                    }
-
-                    self.state.idle();
-
-                    event_status = event::Status::Captured;
-                }
-            }
-            _ => {}
-        }
-
         let picked_pane = self.state.picked_pane().map(|(pane, _)| pane);
 
-        self.elements
+        let items_event_status = self.elements
             .iter_mut()
             .enumerate()
             .zip(layout.children())
@@ -298,7 +258,53 @@ where
                     is_picked,
                 )
             })
-            .fold(event_status, event::Status::merge)
+            .fold(event_status, event::Status::merge);
+
+        if items_event_status == event::Status::Captured {
+            return items_event_status
+        } else {
+            match event {
+                Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                    let bounds = layout.bounds();
+    
+                    if bounds.contains(cursor_position) {
+                        event_status = event::Status::Captured;
+                        self.click_pane(layout, cursor_position, messages);
+                    }
+                }
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                    if let Some((pane, _)) = self.state.picked_pane() {
+                        if let Some(on_drag) = &self.on_drag {
+                            let mut dropped_region =
+                                self.elements.iter().enumerate().zip(layout.children()).filter(
+                                    |(_, layout)| {
+                                        layout.bounds().contains(cursor_position)
+                                    },
+                                );
+    
+                            let event = match dropped_region.next() {
+                                Some(((target,_), _)) if pane != target => {
+                                    DragEvent::Dropped {
+                                        pane,
+                                        target
+                                    }
+                                }
+                                _ => DragEvent::Canceled { pane },
+                            };
+    
+                            messages.push(on_drag(event));
+                        }
+    
+                        self.state.idle();
+    
+                        event_status = event::Status::Captured;
+                    }
+                }
+                _ => {}
+            };
+
+            return event_status;
+        }
     }
 
     fn draw(

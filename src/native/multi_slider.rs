@@ -178,13 +178,14 @@ where
     ) -> event::Status {
         let content_bounds = layout.children().next().unwrap().bounds();
         let slider_width = (content_bounds.width / self.values.len() as f32).floor();
+        let max_index = self.values.len() - 1;
 
         let mut change = || -> () {
             let slider_index = {
                 if cursor_position.x >= content_bounds.x + content_bounds.width {
-                    self.values.len() - 1
+                    max_index
                 } else if cursor_position.x >= content_bounds.x {
-                    ((cursor_position.x - content_bounds.x) / slider_width) as usize
+                    (((cursor_position.x - content_bounds.x) / slider_width) as usize).min(max_index)
                 } else {
                     0
                 }

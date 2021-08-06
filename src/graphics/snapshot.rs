@@ -1,6 +1,6 @@
 use iced_native::{ 
     mouse, Rectangle, Background, Color, 
-    Element, Layout, Point
+    Element, Layout, Point, Size
 };
 use iced_graphics::{Backend, Primitive, Renderer, defaults};
 
@@ -44,17 +44,14 @@ where
             x.1.cmp(&y.1)
         });
 
-        let step_dim: Rectangle = get_step_dimension(bounds, NUM_STEPS + 1, NUM_PERCS);
-        let offset_x = step_dim.x;
-        let offset_y = step_dim.y;
-
-        let style: Style = if selected { style.default() } else { style.selected() };
+        let step_dim: Size = get_step_dimension(bounds, NUM_STEPS + 2, NUM_PERCS);
+        let style: Style = if selected { style.selected() } else { style.default() };
 
         let mut primitives: Vec<Primitive> = events.iter().map(|(step, track, grid_event)| {
             Primitive::Quad {
                 bounds: Rectangle{
-                    x: bounds.x + offset_x + ((*step as f32 + grid_event.offset) * step_dim.width).floor(),
-                    y: bounds.y + offset_y + *track as f32 * step_dim.height,
+                    x: bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width).round(),
+                    y: bounds.y + (*track as f32 * step_dim.height).round(),
                     width: step_dim.width,
                     height: step_dim.height
                 },
@@ -70,7 +67,7 @@ where
                 bounds,
                 background: Background::Color(Color::BLACK),
                 border_radius: 0.,
-                border_width: 1.,
+                border_width: 0.,
                 border_color: Color::WHITE
             }
         );

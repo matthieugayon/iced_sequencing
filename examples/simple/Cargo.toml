@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 iced = { git = "https://github.com/hecrj/iced" }
 iced_native = { git = "https://github.com/hecrj/iced" }
+
 iced_sequencing = { path = "../../" }
 ganic-no-std = { path = "../../../ganic_rs-workspace/ganic-no-std" }

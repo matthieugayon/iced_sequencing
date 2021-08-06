@@ -1,7 +1,6 @@
 // Import iced modules.
-use iced::{Align, Button, Color, Column, Container, Element, Length, Point, Row, Sandbox, Settings, Text, button, container};
+use iced::{Align, Button, Color, Column, Container, Element, Length, Sandbox, Settings, Text, button, container};
 
-use iced_native::{Overlay, Renderer, overlay};
 // Import iced_audio sequencing.
 use iced_sequencing::{grid, snapshot, h_list, multi_slider};
 use iced_sequencing::style::color_utils::hex;
@@ -108,8 +107,26 @@ impl Sandbox for App {
             Message::AddSnapshotPressed => {
                 self.snapshot_list.push(Item::new(Some(Pattern::new_test())))
             },
-            Message::Delete(snapshot_index) => {
+            Message::Delete(delete_index) => {
+                // we first need to correct current snappshot index
+                let new_index = match self.current_snapshot {
+                    index if index >= delete_index && index > 0 => {
+                        self.current_snapshot - 1
+                    }
+                    _ => {
+                        self.current_snapshot
+                    }
+                };
 
+                if self.current_snapshot != new_index {
+                    self.current_snapshot = new_index;
+
+                    // update grid state
+                    let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
+                    self.grid_state.new_pattern(current_snapshot);
+                }
+                
+                self.snapshot_list.remove(delete_index);
             },
         }
     }
@@ -130,6 +147,10 @@ impl Sandbox for App {
 
                 // let title_bar = h_list::TitleBar::new(title)
                 //     .controls(pane.controls.view(pane_index, number_of_snapshots));
+
+                let controls = Column::new()
+                    .padding(5)
+                    .push(pane.controls.view(pane_index, number_of_snapshots));
                     
                 let is_focused = current_snapshot == pane_index;
                 let snapshot = snapshot::Snapshot::new(
@@ -138,13 +159,13 @@ impl Sandbox for App {
                         Length::Fill
                     )
                     .select(is_focused)
-                    .controls(pane.controls.view(pane_index, number_of_snapshots));
+                    .controls(controls);
                 
                 h_list::Content::new(snapshot)
             })
             .width(Length::Fill)
             .height(Length::from(Length::Units(50)))
-            .spacing(0)
+            .spacing(2)
             .on_click(Message::Clicked)
             .on_drag(Message::Dragged);
 
@@ -231,8 +252,9 @@ impl Controls {
         number_of_items: usize
     ) -> Element<Message> {
         let mut button =
-            Button::new(&mut self.close, Text::new("Close").size(14))
-                .padding(3);
+            Button::new(&mut self.close, Text::new("Del").size(10))
+                .padding(2);
+
         if number_of_items > 1 {
             button = button.on_press(Message::Delete(snapshot_index));
         }
