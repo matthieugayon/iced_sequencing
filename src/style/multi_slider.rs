@@ -29,10 +29,10 @@ struct Default;
 impl StyleSheet for Default {
     fn default(&self, primary_color: Color) -> Style {
         Style {
-            background: None,
+            background: Some(Background::Color(lighten(Color::BLACK, 0.92))),
             border_radius: 0.0,
-            border_width: 0.0,
-            border_color: Color::TRANSPARENT,
+            border_width: 1.0,
+            border_color: lighten(Color::BLACK, 0.7),
             slider: Slider {
                 color: primary_color,
                 marker_height: 1.,
@@ -43,10 +43,10 @@ impl StyleSheet for Default {
 
     fn active(&self, primary_color: Color) -> Style {
         Style {
-            background: None,
+            background: Some(Background::Color(lighten(Color::BLACK, 0.92))),
             border_radius: 0.0,
-            border_width: 0.0,
-            border_color: Color::TRANSPARENT,
+            border_width: 1.0,
+            border_color: lighten(Color::BLACK, 0.7),
             slider: Slider {
                 color: darken(primary_color, 0.1),
                 marker_height: 1.,

@@ -1,4 +1,4 @@
-use iced_native::{Rectangle, mouse, Background, Color, Point, Padding};
+use iced_native::{Rectangle, mouse, Background, Color, Point};
 use iced_graphics::{Backend, Renderer, Primitive};
 
 use crate::native::multi_slider;
@@ -23,7 +23,6 @@ where
         range: std::ops::RangeInclusive<f32>,
         values: Vec<f32>,
         active: Option<usize>,
-        is_dragging: bool,
         spacing: u16,
         base_color: Color,
         style_sheet: &Self::Style
@@ -31,7 +30,8 @@ where
         let style = style_sheet.default(base_color);
         let highlight_slider_style = style_sheet.highlight(base_color);
         let hovered_slider_style = style_sheet.hovered(base_color);
-        let slider_width = (content_bounds.width / values.len() as f32).floor();
+        let slider_width = content_bounds.width / values.len() as f32;
+        let (range_start, range_end) = range.into_inner();
         
         let mut primitives = vec![];
 
@@ -53,17 +53,23 @@ where
                     .iter()
                     .enumerate()
                     .map(|(index, value)| {
-                        let slider_height = content_bounds.height * *value;
+                        let ranged_value = if range_start >= range_end {
+                            0.0
+                        } else {
+                            (value - range_start) / (range_end - range_start)
+                        };
+                        let slider_height = content_bounds.height * ranged_value;
+
                         let slider_range_bounds = Rectangle {
-                            x: content_bounds.x + index as f32 * slider_width + spacing as f32,
+                            x: content_bounds.x + index as f32 * slider_width,
                             y: content_bounds.y,
-                            width: slider_width - 2. * spacing as f32,
+                            width: slider_width,
                             height: content_bounds.height,
                         };
                         let slider_bounds = Rectangle {
-                            x: content_bounds.x + index as f32 * slider_width + spacing as f32,
+                            x: (content_bounds.x + index as f32 * slider_width + spacing as f32).round(),
                             y: content_bounds.y + content_bounds.height - slider_height,
-                            width: slider_width - 2. * spacing as f32,
+                            width: (slider_width - 2. * spacing as f32).round(),
                             height: slider_height,
                         };
 

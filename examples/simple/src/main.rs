@@ -1,5 +1,11 @@
 // Import iced modules.
-use iced::{Align, Button, Color, Column, Container, Element, Length, Sandbox, Settings, Text, button, container};
+use iced::{
+    Align, Button, Color, Column, Container,
+    Element, Length, Sandbox, Settings, Text, button, 
+    container
+};
+
+use iced_native::Padding;
 
 // Import iced_audio sequencing.
 use iced_sequencing::{grid, snapshot, h_list, multi_slider};
@@ -185,6 +191,7 @@ impl Sandbox for App {
                 hex("ff7d00")
             )
             .spacing(2)
+            .padding(Padding::from([6, 4]))
             .height(Length::from(Length::Units(120)))
             .step(0.01);
 
