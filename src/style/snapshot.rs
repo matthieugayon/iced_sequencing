@@ -1,9 +1,14 @@
-use iced_native::Color;
-
-use super::color_utils::hex;
+use iced_native::{Color, Background};
+use super::color_utils::{lighten, hex};
 
 pub struct Style {
-    pub step_color: Color
+    pub background: Option<Background>,
+    pub border_radius: f32,
+    pub border_width: f32,
+    pub border_color: Color,
+    pub step_color: Color,
+    pub line_edge_color: Color,
+    pub line_division_color: Color
 }
 
 pub trait StyleSheet {
@@ -16,13 +21,25 @@ pub struct Default;
 impl StyleSheet for Default {
     fn default(&self) -> Style {
         Style {
-            step_color: Color::from_rgb(0.46, 0.46, 0.46)
+            background: Some(Background::Color(lighten(Color::BLACK, 0.2))),
+            border_radius: 0.0,
+            border_width: 1.0,
+            border_color: lighten(Color::BLACK, 0.7),
+            step_color: Color::from_rgb(0.46, 0.46, 0.46),
+            line_edge_color: lighten(Color::BLACK, 0.25),
+            line_division_color: lighten(Color::BLACK, 0.3),
         }
     }
 
     fn selected(&self) -> Style {
         Style {
-            step_color: hex("00aeca")
+            background: Some(Background::Color(lighten(Color::BLACK, 0.2))),
+            border_radius: 0.0,
+            border_width: 1.0,
+            border_color: lighten(Color::BLACK, 0.7),
+            step_color: hex("ff7d00"),
+            line_edge_color: lighten(Color::BLACK, 0.25),
+            line_division_color: lighten(Color::BLACK, 0.3),
         }
     }
 }

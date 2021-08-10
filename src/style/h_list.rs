@@ -1,32 +1,28 @@
+use iced_native::{Color, Background};
+use super::color_utils::lighten;
 
-use iced_native::Color;
-
-pub trait StyleSheet {
-    fn picked_split(&self) -> Option<Line>;
-    fn hovered_split(&self) -> Option<Line>;
+#[derive(Debug, Clone, Copy)]
+pub struct Style {
+    pub background: Option<Background>,
+    pub border_radius: f32,
+    pub border_width: f32,
+    pub border_color: Color,
 }
 
-/// A line.
-///
-/// It is normally used to define the highlight of something, like a split.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Line {
-    /// The [`Color`] of the [`Line`].
-    pub color: Color,
-
-    /// The width of the [`Line`].
-    pub width: f32,
+pub trait StyleSheet {
+    fn default(&self) -> Style;
 }
 
 struct Default;
 
 impl StyleSheet for Default {
-    fn picked_split(&self) -> Option<Line> {
-        None
-    }
-
-    fn hovered_split(&self) -> Option<Line> {
-        None
+    fn default(&self) -> Style {
+        Style {
+            background: Some(Background::Color(lighten(Color::BLACK, 0.92))),
+            border_radius: 0.0,
+            border_width: 1.0,
+            border_color: lighten(Color::BLACK, 0.7),
+        }
     }
 }
 

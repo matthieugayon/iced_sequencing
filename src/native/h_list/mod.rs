@@ -11,7 +11,7 @@ use iced_native::{
     mouse, overlay, row, 
     Clipboard, Element, Hasher, Layout, 
     Length, Point, Rectangle, Size, Vector,
-    Widget
+    Widget, Padding
 };
 
 #[allow(missing_debug_implementations)]
@@ -22,6 +22,7 @@ pub struct HList<'a, Message, Renderer: self::Renderer> {
     width: Length,
     height: Length,
     spacing: u16,
+    padding: Padding,
     on_click: Option<Box<dyn Fn(usize) -> Message + 'a>>,
     on_drag: Option<Box<dyn Fn(DragEvent) -> Message + 'a>>,
     style: <Renderer as self::Renderer>::Style,
@@ -31,10 +32,6 @@ impl<'a, Message, Renderer> HList<'a, Message, Renderer>
 where
     Renderer: self::Renderer,
 {
-    /// Creates a [`HList`] with the given [`State`] and view function.
-    ///
-    /// The view function will be called to display each [`Pane`] present in the
-    /// [`State`].
     pub fn new<T>(
         state: &'a mut State<T>,
         view: impl Fn(usize, &'a mut T) -> Content<'a, Message, Renderer>,
@@ -55,38 +52,38 @@ where
             height: Length::Fill,
             size: 16,
             spacing: 0,
+            padding: Padding::ZERO,
             on_click: None,
             on_drag: None,
             style: Default::default(),
         }
     }
 
-    /// Sets the width of the [`HList`].
     pub fn width(mut self, width: Length) -> Self {
         self.width = width;
         self
     }
 
-    /// Sets the height of the [`HList`].
     pub fn height(mut self, height: Length) -> Self {
         self.height = height;
         self
     }
 
-    /// Sets the spacing _between_ the panes of the [`HList`].
     pub fn spacing(mut self, units: u16) -> Self {
         self.spacing = units;
         self
     }
 
-    /// Sets the max number of panes of the [`HList`].
+    pub fn padding<P: Into<Padding>>(mut self, padding: P) -> Self {
+        self.padding = padding.into();
+        self
+    }
+
     pub fn size(mut self, number_of_panes: usize) -> Self {
         self.size = number_of_panes;
         self
     }
 
-    /// Sets the message that will be produced when a [`Pane`] of the
-    /// [`HList`] is clicked.
     pub fn on_click<F>(mut self, f: F) -> Self
     where
         F: 'a + Fn(usize) -> Message,
@@ -95,8 +92,6 @@ where
         self
     }
 
-    /// Enables the drag and drop interactions of the [`HList`], which will
-    /// use the provided function to produce messages.
     pub fn on_drag<F>(mut self, f: F) -> Self
     where
         F: 'a + Fn(DragEvent) -> Message,
@@ -105,7 +100,6 @@ where
         self
     }
 
-    /// Sets the style of the [`HList`].
     pub fn style(
         mut self,
         style: impl Into<<Renderer as self::Renderer>::Style>,
@@ -151,30 +145,18 @@ where
     }
 }
 
-/// An event produced during a drag and drop interaction of a [`HList`].
 #[derive(Debug, Clone, Copy)]
 pub enum DragEvent {
-    /// A [`Pane`] was picked for dragging.
     Picked {
-        /// The picked [`Pane`].
         pane: usize,
     },
-
-    /// A [`Pane`] was dropped on top of another [`Pane`].
     Dropped {
-        /// The picked [`Pane`].
         pane: usize,
-
-        /// The [`Pane`] where the picked one was dropped on.
         target: usize,
     },
-
-    /// A [`Pane`] was picked and then dropped outside of other [`Pane`]
-    /// boundaries.
     Canceled {
-        /// The picked [`Pane`].
         pane: usize,
-    },
+    }
 }
 
 
@@ -196,7 +178,7 @@ where
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let limits = limits.width(self.width).height(self.height);
+        let limits = limits.width(self.width).height(self.height).pad(self.padding);
         let size = limits.resolve(Size::ZERO);
         let number_of_elements = self.elements.len();
 
@@ -206,7 +188,6 @@ where
             .enumerate()
             .filter_map(|(pane, element)| {
                 let area_width = size.width / number_of_elements as f32;
-
                 let region = Rectangle {
                   x: ((pane as f32 * area_width) + self.spacing as f32).round(),
                   y: 0.,
@@ -215,17 +196,20 @@ where
                 }; 
 
                 let size = Size::new(region.width, region.height);
-
-                let mut node =
-                    element.layout(renderer, &layout::Limits::new(size, size));
-
+                let mut node = element.layout(renderer, &layout::Limits::new(size, size));
                 node.move_to(Point::new(region.x, region.y));
-
                 Some(node)
             })
             .collect();
 
-        layout::Node::with_children(size, children)
+        let mut node = layout::Node::with_children(size, children);
+
+        node.move_to(Point::new(
+            self.padding.left.into(),
+            self.padding.top.into(),
+        ));
+
+        layout::Node::with_children(node.size().pad(self.padding), vec![node])
     }
 
     fn on_event(
@@ -237,14 +221,14 @@ where
         clipboard: &mut dyn Clipboard,
         messages: &mut Vec<Message>,
     ) -> event::Status {
+        let content_layout = layout.children().next().unwrap();
         let mut event_status = event::Status::Ignored;
-
         let picked_pane = self.state.picked_pane().map(|(pane, _)| pane);
 
         let items_event_status = self.elements
             .iter_mut()
             .enumerate()
-            .zip(layout.children())
+            .zip(content_layout.children())
             .map(|((index, content), layout)| {
                 let is_picked = picked_pane == Some(index);
 
@@ -265,18 +249,18 @@ where
         } else {
             match event {
                 Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                    let bounds = layout.bounds();
+                    let bounds = content_layout.bounds();
     
                     if bounds.contains(cursor_position) {
                         event_status = event::Status::Captured;
-                        self.click_pane(layout, cursor_position, messages);
+                        self.click_pane(content_layout, cursor_position, messages);
                     }
                 }
                 Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                     if let Some((pane, _)) = self.state.picked_pane() {
                         if let Some(on_drag) = &self.on_drag {
                             let mut dropped_region =
-                                self.elements.iter().enumerate().zip(layout.children()).filter(
+                                self.elements.iter().enumerate().zip(content_layout.children()).filter(
                                     |(_, layout)| {
                                         layout.bounds().contains(cursor_position)
                                     },
@@ -346,9 +330,11 @@ where
         &mut self,
         layout: Layout<'_>,
     ) -> Option<overlay::Element<'_, Message, Renderer>> {
+        let content_layout = layout.children().next().unwrap();
+
         self.elements
             .iter_mut()
-            .zip(layout.children())
+            .zip(content_layout.children())
             .filter_map(|(pane, layout)| pane.overlay(layout))
             .next()
     }

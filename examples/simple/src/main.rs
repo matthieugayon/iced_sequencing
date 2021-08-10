@@ -98,6 +98,7 @@ impl Sandbox for App {
                 target,
             }) => {
                 self.snapshot_list.swap(pane, target);
+                self.current_snapshot = target;
             },
             Message::Dragged(_) => {},
             Message::Clicked(index) => {
@@ -149,11 +150,6 @@ impl Sandbox for App {
         let current_snapshot = self.current_snapshot;
         
         let list = h_list::HList::new(&mut self.snapshot_list, |pane_index, pane| {
-                // let title = Container::new();
-
-                // let title_bar = h_list::TitleBar::new(title)
-                //     .controls(pane.controls.view(pane_index, number_of_snapshots));
-
                 let controls = Column::new()
                     .padding(5)
                     .push(pane.controls.view(pane_index, number_of_snapshots));
@@ -170,8 +166,9 @@ impl Sandbox for App {
                 h_list::Content::new(snapshot)
             })
             .width(Length::Fill)
-            .height(Length::from(Length::Units(50)))
+            .height(Length::from(Length::Units(60)))
             .spacing(2)
+            .padding(Padding::from(4))
             .on_click(Message::Clicked)
             .on_drag(Message::Dragged);
 
@@ -196,7 +193,6 @@ impl Sandbox for App {
             .step(0.01);
 
         let content: Element<_> = Column::new()
-            .max_width(690)
             .align_items(Align::Center)
             .push(
                 Button::new(&mut self.add_snapshot_button, Text::new("Add new snapshot"))
@@ -206,10 +202,11 @@ impl Sandbox for App {
             .push(grid)
             .push(multi_slider)
             .spacing(16)
+            .width(Length::Units(690))
             .into();
 
         Container::new(content)
-            .width(Length::from(Length::Units(690)))
+            .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
             .center_y()

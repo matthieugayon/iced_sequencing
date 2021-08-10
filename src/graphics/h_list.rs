@@ -7,7 +7,7 @@ use crate::native::h_list;
 pub use crate::native::h_list::{
   State, Content, TitleBar, DragEvent
 };
-pub use crate::style::h_list::{Line, StyleSheet};
+pub use crate::style::h_list::{Style, StyleSheet};
 
 pub type HList<'a, Message, Backend> =
     h_list::HList<'a, Message, Renderer<Backend>>;
@@ -24,10 +24,14 @@ where
         content: &[Content<'_, Message, Self>],
         dragging: Option<(usize, Point)>,
         layout: Layout<'_>,
-        _style_sheet: &<Self as h_list::Renderer>::Style,
+        style_sheet: &<Self as h_list::Renderer>::Style,
         cursor_position: Point,
         viewport: &Rectangle,
     ) -> Self::Output {
+        let bounds = layout.bounds();
+        let content_layout = layout.children().next().unwrap();
+        let style = style_sheet.default();
+
         let pane_cursor_position = if dragging.is_some() {
             // TODO: Remove once cursor availability is encoded in the type
             // system
@@ -41,7 +45,7 @@ where
 
         let mut panes: Vec<_> = content
             .iter()
-            .zip(layout.children())
+            .zip(content_layout.children())
             .enumerate()
             .map(|(id, (pane, layout))| {
                 let (primitive, new_mouse_interaction) = pane.draw(
@@ -66,7 +70,7 @@ where
             })
             .collect();
 
-        let primitives = if let Some((index, layout, origin)) = dragged_pane
+        let mut primitives = if let Some((index, layout, origin)) = dragged_pane
         {
             let pane = panes.remove(index);
             let bounds = layout.bounds();
@@ -76,7 +80,7 @@ where
             let clip = Primitive::Clip {
                 bounds: Rectangle {
                     x: cursor_position.x - origin.x,
-                    y: cursor_position.y - origin.y,
+                    y: bounds.y,
                     width: bounds.width + 0.5,
                     height: bounds.height + 0.5,
                 },
@@ -84,7 +88,7 @@ where
                 content: Box::new(Primitive::Translate {
                     translation: Vector::new(
                         cursor_position.x - bounds.x - origin.x,
-                        cursor_position.y - bounds.y - origin.y,
+                        0.,
                     ),
                     content: Box::new(pane),
                 }),
@@ -96,6 +100,18 @@ where
         } else {
             panes
         };
+
+        if style.background.is_some() || style.border_width > 0.0 {
+            primitives.insert(0, Primitive::Quad {
+                bounds,
+                background: style
+                    .background
+                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                border_radius: style.border_radius,
+                border_width: style.border_width,
+                border_color: style.border_color,
+            });
+        }
 
         (
             Primitive::Group { primitives },
