@@ -14,12 +14,12 @@ pub const CONTAINER_PADDING_LEFT: f32 = 0.;
 pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.05;
 
-pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
-    Point {
-        x: (point.x - bounds.x).ceil(),
-        y: (point.y - bounds.y).ceil(),
-    }
-}
+// pub fn normalize_point(point: Point, bounds: Rectangle) -> Point {
+//     Point {
+//         x: (point.x - bounds.x).ceil(),
+//         y: (point.y - bounds.y).ceil(),
+//     }
+// }
 
 pub fn is_point_inside_clickable_area(point: Point, bounds: Rectangle) -> bool {
     let step_size = get_step_dimensions(bounds);
@@ -34,17 +34,6 @@ pub fn is_point_inside_clickable_area(point: Point, bounds: Rectangle) -> bool {
     clickable_area.contains(point)
 }
 
-pub fn is_point_inside_draggable_area(point: Point, bounds: Rectangle) -> bool {
-    let draggable_area = Rectangle {
-        x: CONTAINER_PADDING_LEFT,
-        y: CONTAINER_PADDING_TOP,
-        width: bounds.width - CONTAINER_PADDING_LEFT,
-        height: bounds.height - CONTAINER_PADDING_TOP
-    };
-    
-    draggable_area.contains(point)
-}
-
 // cursor and bounds are normalized normalized
 pub fn pad_cursor(point: Point, bounds: Rectangle) -> Point {
     return Point {
@@ -54,19 +43,19 @@ pub fn pad_cursor(point: Point, bounds: Rectangle) -> Point {
 }
 
 pub fn get_step_dimensions(bounds: Rectangle) -> Size {
-  return Size {
-      width: (bounds.width - CONTAINER_PADDING_LEFT) / (NUM_STEPS + 1) as f32,
-      height: ((bounds.height - CONTAINER_PADDING_TOP) / NUM_PERCS as f32) - TRACK_MARGIN_BOTTOM
-  }    
+    return Size {
+        width: (bounds.width - CONTAINER_PADDING_LEFT) / (NUM_STEPS + 1) as f32,
+        height: ((bounds.height - CONTAINER_PADDING_TOP) / NUM_PERCS as f32) - TRACK_MARGIN_BOTTOM
+    }    
 }
 
 pub fn get_event_absolute_position(step: usize, track: usize, offset: f32, bounds: Rectangle) -> Point {
-  let step_size = get_step_dimensions(bounds);
+    let step_size = get_step_dimensions(bounds);
 
-  return Point {
-      x: (CONTAINER_PADDING_LEFT + (offset * step_size.width) + step as f32 * step_size.width).ceil(),
-      y: (CONTAINER_PADDING_TOP + track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)).ceil()
-  }
+    return Point {
+        x: (CONTAINER_PADDING_LEFT + (offset * step_size.width) + step as f32 * step_size.width).ceil(),
+        y: (CONTAINER_PADDING_TOP + track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM)).ceil()
+    }
 }
 
 pub fn get_hovered_step(cursor: Point, bounds: Rectangle) -> Option<(usize, usize, f32)> {

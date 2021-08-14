@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use iced_native::{
     event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout,
-    Length, Point, Rectangle, Size, Widget
+    Length, Point, Rectangle, Size, Widget, Padding
 };
 
 use std::hash::Hash;
@@ -10,7 +10,7 @@ use std::hash::Hash;
 use ganic_no_std::{pattern::Pattern, NUM_PERCS};
 
 use crate::core::grid::{
-    GridPattern, normalize_point, GridMessage
+    GridPattern, GridMessage
 }; 
 
 pub mod modes;
@@ -23,6 +23,7 @@ pub struct Grid<'a, Message, Renderer: self::Renderer> {
     on_track_focus: Box<dyn Fn(usize) -> Message>,
     width: Length,
     height: Length,
+    padding: Padding,
     style: Renderer::Style
 }
 
@@ -44,6 +45,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
             on_track_focus: Box::new(on_track_focus),
             width,
             height,
+            padding: Padding::ZERO,
             style: Renderer::Style::default()
         }
     }
@@ -55,6 +57,11 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 
     pub fn height(mut self, height: Length) -> Self {
         self.height = height;
+        self
+    }
+
+    pub fn padding<P: Into<Padding>>(mut self, padding: P) -> Self {
+        self.padding = padding.into();
         self
     }
 
@@ -190,11 +197,20 @@ where
         _renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let limits = limits.width(self.width).height(self.height);
+        let limits = limits
+            .width(self.width)
+            .height(self.height)
+            .pad(self.padding);
 
-        let size = limits.resolve(Size::ZERO);
+        let mut content = layout::Node::new(limits.resolve(Size::ZERO));
+        content.move_to(Point::new(
+            self.padding.left.into(),
+            self.padding.top.into(),
+        ));
 
-        layout::Node::new(size)
+        let size = limits.resolve(content.size()).pad(self.padding);
+
+        layout::Node::with_children(size, vec![content])
     }
 
     fn on_event(
@@ -206,7 +222,7 @@ where
         _clipboard: &mut dyn Clipboard,
         messages: &mut Vec<Message>
     ) -> event::Status {
-        let bounds = layout.bounds();
+        let bounds = layout.children().next().unwrap().bounds();
 
         // dispatch events to our state machine whose states (modes) and substates are defined 
         // in ./modes
@@ -217,21 +233,13 @@ where
             return event::Status::Ignored
         }
 
-        let normalized_cursor_position = normalize_point(cursor_position, bounds);
-        let normalized_bounds = Rectangle {
-            x: 0.0,
-            y: 0.0,
-            width: bounds.width,
-            height: bounds.height
-        };
-
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     self.handle_event(|widget_state, context| {
                         widget_state.on_cursor_moved(
-                            normalized_bounds,
-                            normalized_cursor_position,
+                            bounds,
+                            cursor_position,
                             context
                         )
                     }, messages);
@@ -241,7 +249,7 @@ where
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if bounds.contains(cursor_position) {
                         let click = mouse::Click::new(
-                            normalized_cursor_position,
+                            cursor_position,
                             self.state.last_click,
                         );
 
@@ -249,8 +257,8 @@ where
                             mouse::click::Kind::Single => {
                                 self.handle_event(|widget_state, context| {
                                     widget_state.on_click(
-                                        normalized_bounds,
-                                        normalized_cursor_position,
+                                        bounds,
+                                        cursor_position,
                                         context
                                     )
                                 }, messages);
@@ -258,8 +266,8 @@ where
                             mouse::click::Kind::Double => {
                                 self.handle_event(|widget_state, context| {
                                     widget_state.on_double_click(
-                                        normalized_bounds,
-                                        normalized_cursor_position,
+                                        bounds,
+                                        cursor_position,
                                         context
                                     )
                                 }, messages);
@@ -275,8 +283,8 @@ where
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.handle_event(|widget_state, context| {
                         widget_state.on_button_release(
-                            normalized_bounds,
-                            normalized_cursor_position,
+                            bounds,
+                            cursor_position,
                             context
                         )
                     }, messages);
