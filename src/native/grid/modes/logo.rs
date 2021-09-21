@@ -1,14 +1,8 @@
-use iced_native::{Rectangle, Point, keyboard, mouse};
-use ganic_no_std::{pattern::Pattern};
+use super::{Idle, Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
-    GridEvent,
-    is_point_inside_clickable_area,
-    get_hovered_step,
-    pad_cursor,
-    GridMessage,
-    DEFAULT_VELOCITY
+    get_hovered_step, get_step_width, GridMessage, GridMessageKind, GridPattern, Target,
 };
-use super::{WidgetState, Transition, WidgetContext, Idle};
+use iced_native::{keyboard, mouse, Point, Rectangle};
 
 #[derive(Debug)]
 pub struct Logo {
@@ -16,8 +10,15 @@ pub struct Logo {
 }
 
 impl WidgetState for Logo {
-    fn on_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_click(bounds, cursor, context);
+    fn on_click(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let (next_transition, messages) =
+            self.nested.on_click(bounds, cursor, base_pattern, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -26,8 +27,16 @@ impl WidgetState for Logo {
         (Transition::DoNothing, messages)
     }
 
-    fn on_double_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_double_click(bounds, cursor, context);
+    fn on_double_click(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let (next_transition, messages) =
+            self.nested
+                .on_double_click(bounds, cursor, base_pattern, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -36,8 +45,16 @@ impl WidgetState for Logo {
         (Transition::DoNothing, messages)
     }
 
-    fn on_button_release(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_button_release(bounds, cursor, context);
+    fn on_button_release(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let (next_transition, messages) =
+            self.nested
+                .on_button_release(bounds, cursor, base_pattern, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -46,8 +63,16 @@ impl WidgetState for Logo {
         (Transition::DoNothing, messages)
     }
 
-    fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_cursor_moved(bounds, cursor, context);
+    fn on_cursor_moved(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let (next_transition, messages) =
+            self.nested
+                .on_cursor_moved(bounds, cursor, base_pattern, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -56,24 +81,30 @@ impl WidgetState for Logo {
         (Transition::DoNothing, messages)
     }
 
-    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_modifier_change(
+        &mut self,
+        modifiers: keyboard::Modifiers,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         let transition: Transition = self.nested.on_modifier_change(modifiers, context).0;
 
         match transition {
             Transition::ChangeState(new_state) => {
                 self.next(new_state);
-                return (Transition::DoNothing, None)
+                return (Transition::DoNothing, None);
             }
             Transition::ChangeParentState(new_state) => {
                 return (Transition::ChangeState(new_state), None)
             }
-            Transition::DoNothing => {
-                return (Transition::DoNothing, None)
-            }
+            Transition::DoNothing => return (Transition::DoNothing, None),
         }
     }
 
-    fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_key_pressed(
+        &mut self,
+        key_code: keyboard::KeyCode,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         let (next_transition, messages) = self.nested.on_key_pressed(key_code, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
@@ -104,7 +135,7 @@ impl Default for Logo {
 impl Logo {
     pub fn selecting(point: Point) -> Logo {
         Logo {
-            nested: Box::new(Selecting::from_args(point))
+            nested: Box::new(Selecting::from_args(point)),
         }
     }
 }
@@ -113,107 +144,141 @@ impl Logo {
 struct Waiting;
 
 impl WidgetState for Waiting {
-    // in Waiting context double click add or remove events
-    // but doesn't change nested context
-    // it's just a side effect
-    fn on_double_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        let padded_cursor = pad_cursor(cursor, bounds);
+    fn on_double_click(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         // check if we hover an event on the grid
-        match context.base_pattern.clone().get_hovered(padded_cursor, bounds) {
+        match base_pattern.get_hovered(cursor, bounds) {
+            // if yes remove event
+            Some((grid_id, _grid_event)) => (
+                Transition::DoNothing,
+                Some(vec![GridMessage {
+                    message: GridMessageKind::Delete(*grid_id),
+                    target: Target::STATE,
+                }]),
+            ),
             // otherwise add event
             None => {
-                if is_point_inside_clickable_area(cursor, bounds) {
-                    match get_hovered_step(cursor, bounds) {
-                        Some((step, track, offset)) => {
-                            context.base_pattern.data.insert((step, track), GridEvent {
-                                offset,
-                                velocity: DEFAULT_VELOCITY,
-                                selected: true
-                            });
-                        }
-                        None => {
-    
-                        }
-                    }
+                let step_width = get_step_width(bounds.size());
+                let interactive_area = Rectangle {
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: bounds.width - step_width,
+                    height: bounds.height,
+                };
+
+                if interactive_area.contains(cursor) {
+                    let (step, track, offset) = get_hovered_step(cursor, bounds, true);
+                    (
+                        Transition::DoNothing,
+                        Some(vec![GridMessage {
+                            message: GridMessageKind::Add((step, track, offset)),
+                            target: Target::STATE,
+                        }]),
+                    )
+                } else {
+                    (Transition::DoNothing, None)
                 }
             }
-            _ => {}
         }
-
-        // replicate base pattern to drawing pattern
-        context.output_pattern = context.base_pattern.clone();
-
-        (Transition::DoNothing, Some(vec![GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))]))
     }
 
-    fn on_click(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_click(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         // check if we hover an event on the grid
-        match context.base_pattern.clone().get_hovered(cursor, bounds) {
-            // if yes remove event
+        match base_pattern.get_hovered(cursor, bounds) {
+            // if yes select event
             Some(((step, track), grid_event)) => {
-                if !grid_event.selected {
-                    context.base_pattern.select_one((step, track));
-                    // replicate base pattern to drawing pattern
-                    context.output_pattern = context.base_pattern.clone();
-                }
+                let grid_messages = {
+                    if !grid_event.selected {
+                        Some(vec![GridMessage {
+                            message: GridMessageKind::SelectOne((*step, *track)),
+                            target: Target::STATE,
+                        }])
+                    } else {
+                        None
+                    }
+                };
 
-                (Transition::ChangeState(Box::new(SetVelocity::from_args(cursor))), None)
+                (
+                    Transition::ChangeState(Box::new(SetVelocity::from_args(cursor))),
+                    grid_messages,
+                )
             }
-            // otherwise add event
-            None => {
-                (Transition::ChangeState(Box::new(Selecting::from_args(cursor))), None)
-            }
+            // otherwise change to area selection mode
+            None => (
+                Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
+                None,
+            ),
         }
     }
 
-    fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        match context.base_pattern.clone().get_hovered(cursor, bounds) {
-            // if yes remove event
+    fn on_cursor_moved(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        match base_pattern.get_hovered(cursor, bounds) {
             Some((_, _)) => {
                 context.mouse_interaction = mouse::Interaction::ResizingVertically;
             }
-            // otherwise add event
             None => {
                 context.mouse_interaction = mouse::Interaction::default();
             }
         }
-        
+
         (Transition::DoNothing, None)
     }
 
-    fn on_key_pressed(&mut self, key_code: keyboard::KeyCode, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        match key_code {
-            keyboard::KeyCode::A => {
-                context.base_pattern.select_all();
-            }
-            keyboard::KeyCode::Backspace => {
-                context.base_pattern.remove_selection();
-            }
-            keyboard::KeyCode::Left => {
-                context.base_pattern.move_selection(-0.05, 0);
-            }
-            keyboard::KeyCode::Up => {
-                context.base_pattern.move_selection(0., -1);
-            }
-            keyboard::KeyCode::Right => {
-                context.base_pattern.move_selection(0.05, 0);
-            }
-            keyboard::KeyCode::Down => {
-                context.base_pattern.move_selection(0., 1);
-            }
-            _ => {}
+    fn on_key_pressed(
+        &mut self,
+        key_code: keyboard::KeyCode,
+        _context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let message_kind = match key_code {
+            keyboard::KeyCode::A => Some(GridMessageKind::SelectAll()),
+            keyboard::KeyCode::Backspace => Some(GridMessageKind::DeleteSelection()),
+            keyboard::KeyCode::Left => Some(GridMessageKind::MoveSelection((-0.05, 0))),
+            keyboard::KeyCode::Up => Some(GridMessageKind::MoveSelection((0., -1))),
+            keyboard::KeyCode::Right => Some(GridMessageKind::MoveSelection((0.05, 0))),
+            keyboard::KeyCode::Down => Some(GridMessageKind::MoveSelection((0., 1))),
+            _ => None,
+        };
+
+        match message_kind {
+            Some(grid_message_kind) => (
+                Transition::DoNothing,
+                Some(vec![GridMessage {
+                    message: grid_message_kind,
+                    target: Target::STATE,
+                }]),
+            ),
+            None => (Transition::DoNothing, None),
         }
-
-        // replicate base pattern to drawing pattern
-        context.output_pattern = context.base_pattern.clone();
-
-        (Transition::DoNothing, Some(vec![GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))]))
     }
 
-    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_modifier_change(
+        &mut self,
+        modifiers: keyboard::Modifiers,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         if !modifiers.logo() {
             context.mouse_interaction = mouse::Interaction::default();
-            (Transition::ChangeParentState(Box::new(Idle::default())), None)
+            (
+                Transition::ChangeParentState(Box::new(Idle::default())),
+                None,
+            )
         } else {
             (Transition::DoNothing, None)
         }
@@ -222,50 +287,87 @@ impl WidgetState for Waiting {
 
 #[derive(Debug, Default)]
 struct Selecting {
-    origin: Point
+    origin: Point,
 }
 
 impl Selecting {
     fn from_args(point: Point) -> Self {
-        Selecting {
-            origin: point,
-        }
+        Selecting { origin: point }
     }
 }
 
 impl WidgetState for Selecting {
-    fn on_cursor_moved(&mut self, bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        // modify base pattern
-        let padded_cursor = pad_cursor(cursor, bounds);
-
+    fn on_cursor_moved(
+        &mut self,
+        bounds: Rectangle,
+        cursor: Point,
+        _base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         let selection = Rectangle {
-            x: if padded_cursor.x - self.origin.x < 0.0 { padded_cursor.x } else { self.origin.x },
-            y: if padded_cursor.y - self.origin.y < 0.0 { padded_cursor.y } else { self.origin.y },
-            width: if padded_cursor.x - self.origin.x < 0.0 { self.origin.x - padded_cursor.x } else { padded_cursor.x - self.origin.x },
-            height: if padded_cursor.y - self.origin.y < 0.0 { self.origin.y - padded_cursor.y } else { padded_cursor.y - self.origin.y }
+            x: if cursor.x - self.origin.x < 0.0 {
+                cursor.x
+            } else {
+                self.origin.x
+            },
+            y: if cursor.y - self.origin.y < 0.0 {
+                cursor.y
+            } else {
+                self.origin.y
+            },
+            width: if cursor.x - self.origin.x < 0.0 {
+                self.origin.x - cursor.x
+            } else {
+                cursor.x - self.origin.x
+            },
+            height: if cursor.y - self.origin.y < 0.0 {
+                self.origin.y - cursor.y
+            } else {
+                cursor.y - self.origin.y
+            },
         };
 
-        context.base_pattern.select_area(selection, bounds);
-
-        // replicate base pattern to drawing pattern
-        context.output_pattern = context.base_pattern.clone();
-
-        // display selection Rectangle 
+        // display selection Rectangle
         context.selection_rectangle = Some(selection);
 
-        (Transition::DoNothing, None)
+        (
+            Transition::DoNothing,
+            Some(vec![GridMessage {
+                message: GridMessageKind::SelectArea(selection, bounds.size()),
+                target: Target::UI,
+            }]),
+        )
     }
 
-    fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        // erase selection Rectangle 
+    fn on_button_release(
+        &mut self,
+        _bounds: Rectangle,
+        _cursor: Point,
+        _base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        // erase selection Rectangle
         context.selection_rectangle = None;
 
-        (Transition::ChangeState(Box::new(Waiting::default())), None)
+        (
+            Transition::ChangeState(Box::new(Waiting::default())),
+            Some(vec![GridMessage {
+                message: GridMessageKind::CommitState(),
+                target: Target::STATE,
+            }]),
+        )
     }
 
-    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, _context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_modifier_change(
+        &mut self,
+        modifiers: keyboard::Modifiers,
+        _context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         if !modifiers.logo() {
-            (Transition::ChangeParentState(Box::new(Idle::selecting(self.origin))), None)
+            (
+                Transition::ChangeParentState(Box::new(Idle::selecting(self.origin))),
+                None,
+            )
         } else {
             (Transition::DoNothing, None)
         }
@@ -274,41 +376,66 @@ impl WidgetState for Selecting {
 
 #[derive(Debug, Default)]
 struct SetVelocity {
-    origin: Point
+    origin: Point,
 }
 
 impl SetVelocity {
     fn from_args(point: Point) -> Self {
-        SetVelocity {
-            origin: point
-        }
+        SetVelocity { origin: point }
     }
 }
 
 impl WidgetState for SetVelocity {
-    fn on_cursor_moved(&mut self, _bounds: Rectangle, cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {  
+    fn on_cursor_moved(
+        &mut self,
+        _bounds: Rectangle,
+        cursor: Point,
+        _base_pattern: GridPattern,
+        _context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         let ratio = (self.origin.y - cursor.y).min(127.).max(-127.) / 127.;
 
-        context.output_pattern = context.base_pattern.clone();
-        context.output_pattern.set_velocity(ratio);
-
-        (Transition::DoNothing, Some(vec![GridMessage::NewPattern(Pattern::from(context.output_pattern.clone()))]))
+        (
+            Transition::DoNothing,
+            Some(vec![GridMessage {
+                message: GridMessageKind::SetVelocity(ratio),
+                target: Target::UI,
+            }]),
+        )
     }
 
-    fn on_button_release(&mut self, _bounds: Rectangle, _cursor: Point, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
-        context.base_pattern.data = context.output_pattern.data.clone();
-        context.mouse_interaction = mouse::Interaction::default();
+    fn on_button_release(
+        &mut self,
+        _bounds: Rectangle,
+        _cursor: Point,
+        _base_pattern: GridPattern,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        // erase selection Rectangle
+        context.selection_rectangle = None;
 
-        (Transition::ChangeState(Box::new(Waiting::default())), None)
+        (
+            Transition::ChangeState(Box::new(Waiting::default())),
+            Some(vec![GridMessage {
+                message: GridMessageKind::CommitState(),
+                target: Target::STATE,
+            }]),
+        )
     }
 
-    fn on_modifier_change(&mut self, modifiers: keyboard::Modifiers, context: &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>) {
+    fn on_modifier_change(
+        &mut self,
+        modifiers: keyboard::Modifiers,
+        context: &mut WidgetContext,
+    ) -> (Transition, Option<Vec<GridMessage>>) {
         if !modifiers.logo() {
             context.mouse_interaction = mouse::Interaction::default();
-            (Transition::ChangeParentState(Box::new(Idle::default())), None)
+            (
+                Transition::ChangeParentState(Box::new(Idle::default())),
+                None,
+            )
         } else {
             (Transition::DoNothing, None)
         }
     }
 }
-

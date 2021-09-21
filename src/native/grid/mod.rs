@@ -1,52 +1,51 @@
 use std::fmt::Debug;
 
 use iced_native::{
-    event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout,
-    Length, Point, Rectangle, Size, Widget, Padding
+    event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout, Length, Padding,
+    Point, Rectangle, Size, Widget,
 };
+
+use iced_graphics::canvas;
 
 use std::hash::Hash;
 
-use ganic_no_std::{pattern::Pattern, NUM_PERCS};
+use ganic_no_std::NUM_PERCS;
 
-use crate::core::grid::{
-    GridPattern, GridMessage
-}; 
+use crate::core::grid::{GridMessage, GridPattern, Target};
 
 pub mod modes;
 
-use modes::{WidgetState, Transition, Idle};
+use modes::{Idle, Transition, WidgetState};
 
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
     state: &'a mut State,
-    on_change: Box<dyn Fn(Pattern) -> Message>,
-    on_track_focus: Box<dyn Fn(usize) -> Message>,
+    live_pattern: GridPattern,
+    on_event: Box<dyn Fn(GridMessage) -> Message>,
     width: Length,
     height: Length,
     padding: Padding,
-    style: Renderer::Style
+    style: Renderer::Style,
 }
 
 impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
-    pub fn new<F, G>(
+    pub fn new<F>(
         state: &'a mut State,
-        on_change: F,
-        on_track_focus: G,
+        live_pattern: GridPattern,
+        on_event: F,
         width: Length,
-        height: Length
+        height: Length,
     ) -> Self
     where
-        F: 'static + Fn(Pattern) -> Message,
-        G: 'static + Fn(usize) -> Message,
+        F: 'static + Fn(GridMessage) -> Message,
     {
         Grid {
             state,
-            on_change: Box::new(on_change),
-            on_track_focus: Box::new(on_track_focus),
+            live_pattern,
+            on_event: Box::new(on_event),
             width,
             height,
             padding: Padding::ZERO,
-            style: Renderer::Style::default()
+            style: Renderer::Style::default(),
         }
     }
 
@@ -71,11 +70,17 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     }
 
     fn handle_event<F>(&mut self, handler: F, messages_queue: &mut Vec<Message>)
-        where F: FnOnce(&mut dyn WidgetState, &mut WidgetContext) -> (Transition, Option<Vec<GridMessage>>),
+    where
+        F: FnOnce(
+            &mut dyn WidgetState,
+            &mut WidgetContext,
+            GridPattern,
+        ) -> (Transition, Option<Vec<GridMessage>>),
     {
         let (transition, grid_messages) = handler(
             &mut *self.state.current_state,
-            &mut self.state.context
+            &mut self.state.context,
+            self.state.base_pattern.clone(),
         );
 
         self.handle_transition(transition);
@@ -83,19 +88,36 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         match grid_messages {
             Some(messages) => {
                 messages.into_iter().for_each(|message| {
-                    match message {
-                        GridMessage::NewPattern(pattern) => {
-                            messages_queue.push((self.on_change)(pattern))
+                    messages_queue.push((self.on_event)(message.clone()));
+                   
+                    match message.target.clone() {
+                        Target::UI => {
+                            self.state.event_cache.clear();
                         },
-                        GridMessage::TrackSelected(track_index) => {
-                            // reverse index
-                            let track = NUM_PERCS - track_index - 1;
-                            messages_queue.push((self.on_track_focus)(track))
-                        },
+                        _ => {},
                     }
+
+                    // match message {
+                    //     GridMessage::NewPattern(grid, target) => {
+                    //         let next_pattern = Pattern::from(grid);
+                    //         match target {
+                    //             PatternTarget::UI => {
+                    //                 messages_queue.push((self.on_ui_change)(next_pattern));
+                    //             },
+                    //             PatternTarget::STATE => {
+                    //                 messages_queue.push((self.on_state_change)(next_pattern));
+                    //             }
+                    //         }
+                    //     },
+                    //     GridMessage::TrackSelected(track_index) => {
+                    //         // reverse index
+                    //         let track = NUM_PERCS - track_index - 1;
+                    //         messages_queue.push((self.on_track_focus)(track))
+                    //     },
+                    // }
                 });
-            },
-            None => {},
+            }
+            None => {}
         }
     }
 
@@ -107,7 +129,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 //     new_state
                 // );
                 self.state.current_state = new_state
-            },
+            }
             _ => {}
         }
     }
@@ -116,51 +138,53 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 #[derive(Debug, Clone)]
 pub struct WidgetContext {
     // base pattern we use as a base (sometimes modifications are not applied, ex: when you drag and press Escape)
-    base_pattern: GridPattern,
-    output_pattern: GridPattern,
     selection_rectangle: Option<Rectangle>,
-    mouse_interaction: mouse::Interaction
+    mouse_interaction: mouse::Interaction,
 }
 
 #[derive(Debug)]
 pub struct State {
     current_state: Box<dyn WidgetState + Send>, // state machine state
-    context: WidgetContext, // context we'll mutate in our state machine
+    context: WidgetContext,                     // context we'll mutate in our state machine
+    base_pattern: GridPattern,
     last_click: Option<mouse::Click>,
     highlight: [usize; NUM_PERCS],
-    is_playing: bool
+    is_playing: bool,
+    grid_cache: canvas::Cache,
+    event_cache: canvas::Cache,
+    highlight_cache: canvas::Cache,
 }
 
 impl State {
-    pub fn new(initial_pattern: Option<Pattern>) -> Self {
-        let base_pattern= {
-            match initial_pattern {
-                Some(pattern) => {
-                    GridPattern::from(pattern)
-                }
-                None => {
-                    GridPattern::new()
-                }
-            }
-        };
-
+    pub fn new(grid: GridPattern) -> Self {
         Self {
             current_state: Box::new(Idle::default()),
             context: WidgetContext {
-                base_pattern: base_pattern.clone(),
-                output_pattern: base_pattern.clone(),
                 selection_rectangle: None,
-                mouse_interaction: mouse::Interaction::default()
+                mouse_interaction: mouse::Interaction::default(),
             },
+            base_pattern: grid,
             last_click: None,
             highlight: [0; NUM_PERCS],
-            is_playing: false
+            is_playing: false,
+            grid_cache: Default::default(),
+            event_cache: Default::default(),
+            highlight_cache: Default::default(),
         }
     }
 
-    pub fn new_pattern(&mut self, pattern: Pattern) {
-        self.context.base_pattern = GridPattern::from(pattern);
-        self.context.output_pattern = self.context.base_pattern.clone();
+    pub fn set_pattern(&mut self, grid: GridPattern) {
+        self.base_pattern = grid;
+        self.event_cache.clear();
+    }
+
+    // pub fn temporary_pattern(&mut self, grid: GridPattern) {
+    //     self.context.temporary_pattern = Some(grid);
+    //     self.event_cache.clear();
+    // }
+
+    pub fn clone_base_pattern(&self) -> GridPattern {
+        self.base_pattern.clone()
     }
 
     pub fn is_playing(&mut self, is_playing: bool) {
@@ -170,17 +194,14 @@ impl State {
     pub fn transport(&mut self, highlight: [Option<usize>; NUM_PERCS]) {
         for (pidx, option_step) in highlight.iter().enumerate() {
             match option_step {
-                Some(step) => {
-                    self.highlight[NUM_PERCS - pidx - 1] = *step
-                }
+                Some(step) => self.highlight[NUM_PERCS - pidx - 1] = *step,
                 None => {}
             }
         }
     }
 }
 
-impl<'a, Message, Renderer> Widget<Message, Renderer>
-    for Grid<'a, Message, Renderer>
+impl<'a, Message, Renderer> Widget<Message, Renderer> for Grid<'a, Message, Renderer>
 where
     Renderer: self::Renderer,
 {
@@ -192,11 +213,7 @@ where
         self.height
     }
 
-    fn layout(
-        &self,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    fn layout(&self, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let limits = limits
             .width(self.width)
             .height(self.height)
@@ -220,58 +237,67 @@ where
         cursor_position: Point,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        messages: &mut Vec<Message>
+        messages: &mut Vec<Message>,
     ) -> event::Status {
         let bounds = layout.children().next().unwrap().bounds();
 
-        // dispatch events to our state machine whose states (modes) and substates are defined 
+        // dispatch events to our state machine whose states (modes) and substates are defined
         // in ./modes
 
         // this is for a bug happening randomly when the cursor leaves the window
         // @TODO: write an issue in the iced repo
         if cursor_position.x < 0. && cursor_position.y < 0. {
-            return event::Status::Ignored
+            return event::Status::Ignored;
         }
 
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
-                    self.handle_event(|widget_state, context| {
-                        widget_state.on_cursor_moved(
-                            bounds,
-                            cursor_position,
-                            context
-                        )
-                    }, messages);
+                    self.handle_event(
+                        |widget_state, context, base_pattern| {
+                            widget_state.on_cursor_moved(
+                                bounds,
+                                cursor_position,
+                                base_pattern,
+                                context,
+                            )
+                        },
+                        messages,
+                    );
 
                     return event::Status::Captured;
                 }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if bounds.contains(cursor_position) {
-                        let click = mouse::Click::new(
-                            cursor_position,
-                            self.state.last_click,
-                        );
+                        let click = mouse::Click::new(cursor_position, self.state.last_click);
 
                         match click.kind() {
                             mouse::click::Kind::Single => {
-                                self.handle_event(|widget_state, context| {
-                                    widget_state.on_click(
-                                        bounds,
-                                        cursor_position,
-                                        context
-                                    )
-                                }, messages);
-                            },
+                                self.handle_event(
+                                    |widget_state, context, base_pattern| {
+                                        widget_state.on_click(
+                                            bounds,
+                                            cursor_position,
+                                            base_pattern,
+                                            context,
+                                        )
+                                    },
+                                    messages,
+                                );
+                            }
                             mouse::click::Kind::Double => {
-                                self.handle_event(|widget_state, context| {
-                                    widget_state.on_double_click(
-                                        bounds,
-                                        cursor_position,
-                                        context
-                                    )
-                                }, messages);
-                            },
+                                self.handle_event(
+                                    |widget_state, context, base_pattern| {
+                                        widget_state.on_double_click(
+                                            bounds,
+                                            cursor_position,
+                                            base_pattern,
+                                            context,
+                                        )
+                                    },
+                                    messages,
+                                );
+                            }
                             _ => {}
                         }
 
@@ -281,13 +307,17 @@ where
                     }
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                    self.handle_event(|widget_state, context| {
-                        widget_state.on_button_release(
-                            bounds,
-                            cursor_position,
-                            context
-                        )
-                    }, messages);
+                    self.handle_event(
+                        |widget_state, context, base_pattern| {
+                            widget_state.on_button_release(
+                                bounds,
+                                cursor_position,
+                                base_pattern,
+                                context,
+                            )
+                        },
+                        messages,
+                    );
 
                     return event::Status::Captured;
                 }
@@ -295,32 +325,28 @@ where
             },
             Event::Keyboard(keyboard_event) => match keyboard_event {
                 keyboard::Event::KeyPressed { key_code, .. } => {
-                    self.handle_event(|widget_state, context| {
-                        widget_state.on_key_pressed(
-                            key_code,
-                            context
-                        )
-                    }, messages);
+                    self.handle_event(
+                        |widget_state, context, _| widget_state.on_key_pressed(key_code, context),
+                        messages,
+                    );
 
                     return event::Status::Captured;
-                } 
+                }
                 keyboard::Event::KeyReleased { key_code, .. } => {
-                    self.handle_event(|widget_state, context| {
-                        widget_state.on_key_released(
-                            key_code,
-                            context
-                        )
-                    }, messages);
+                    self.handle_event(
+                        |widget_state, context, _| widget_state.on_key_released(key_code, context),
+                        messages,
+                    );
 
                     return event::Status::Captured;
-                }            
+                }
                 keyboard::Event::ModifiersChanged(modifiers) => {
-                    self.handle_event(|widget_state, context| {
-                        widget_state.on_modifier_change(
-                            modifiers,
-                            context
-                        )
-                    }, messages);
+                    self.handle_event(
+                        |widget_state, context, _| {
+                            widget_state.on_modifier_change(modifiers, context)
+                        },
+                        messages,
+                    );
 
                     return event::Status::Captured;
                 }
@@ -342,13 +368,17 @@ where
     ) -> Renderer::Output {
         renderer.draw(
             layout.bounds(),
+            layout.children().next().unwrap().bounds(),
             cursor_position,
-            self.state.context.output_pattern.to_owned(),
+            &self.live_pattern,
             self.state.context.selection_rectangle,
             self.state.context.mouse_interaction,
             self.state.is_playing,
             self.state.highlight,
-            &self.style
+            &self.style,
+            &self.state.grid_cache,
+            &self.state.event_cache,
+            &self.state.highlight_cache,
         )
     }
 
@@ -367,25 +397,26 @@ pub trait Renderer: iced_native::Renderer {
     fn draw(
         &mut self,
         bounds: Rectangle,
+        drawable_area: Rectangle,
         cursor_position: Point,
-        grid_pattern: GridPattern,
+        grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
         mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
-        style: &Self::Style
+        style: &Self::Style,
+        grid_cache: &canvas::Cache,
+        event_cache: &canvas::Cache,
+        highlight_cache: &canvas::Cache,
     ) -> Self::Output;
 }
 
-impl<'a, Message, Renderer> From<Grid<'a, Message, Renderer>>
-    for Element<'a, Message, Renderer>
+impl<'a, Message, Renderer> From<Grid<'a, Message, Renderer>> for Element<'a, Message, Renderer>
 where
     Renderer: 'a + self::Renderer,
     Message: 'a,
 {
-    fn from(
-        grid: Grid<'a, Message, Renderer>,
-    ) -> Element<'a, Message, Renderer> {
+    fn from(grid: Grid<'a, Message, Renderer>) -> Element<'a, Message, Renderer> {
         Element::new(grid)
     }
 }

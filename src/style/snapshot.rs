@@ -1,5 +1,5 @@
-use iced_native::{Color, Background};
-use super::color_utils::{lighten, hex};
+use super::color_utils::{hex, lighten};
+use iced_native::{Background, Color};
 
 pub struct Style {
     pub background: Option<Background>,
@@ -8,7 +8,7 @@ pub struct Style {
     pub border_color: Color,
     pub step_color: Color,
     pub line_edge_color: Color,
-    pub line_division_color: Color
+    pub line_division_color: Color,
 }
 
 pub trait StyleSheet {

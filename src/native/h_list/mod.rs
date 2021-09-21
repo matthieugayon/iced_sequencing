@@ -7,11 +7,8 @@ pub use state::State;
 pub use title_bar::TitleBar;
 
 use iced_native::{
-    container, Event, event, layout, 
-    mouse, overlay, row, 
-    Clipboard, Element, Hasher, Layout, 
-    Length, Point, Rectangle, Size, Vector,
-    Widget, Padding
+    container, event, layout, mouse, overlay, row, Clipboard, Element, Event, Hasher, Layout,
+    Length, Padding, Point, Rectangle, Size, Vector, Widget,
 };
 
 #[allow(missing_debug_implementations)]
@@ -100,10 +97,7 @@ where
         self
     }
 
-    pub fn style(
-        mut self,
-        style: impl Into<<Renderer as self::Renderer>::Style>,
-    ) -> Self {
+    pub fn style(mut self, style: impl Into<<Renderer as self::Renderer>::Style>) -> Self {
         self.style = style.into();
         self
     }
@@ -119,10 +113,12 @@ where
         cursor_position: Point,
         messages: &mut Vec<Message>,
     ) {
-        let mut clicked_region =
-            self.elements.iter().enumerate().zip(layout.children()).filter(
-                |(_, layout)| layout.bounds().contains(cursor_position),
-            );
+        let mut clicked_region = self
+            .elements
+            .iter()
+            .enumerate()
+            .zip(layout.children())
+            .filter(|(_, layout)| layout.bounds().contains(cursor_position));
 
         if let Some(((pick_index, content), layout)) = clicked_region.next() {
             if let Some(on_click) = &self.on_click {
@@ -133,8 +129,7 @@ where
                 if content.can_be_picked_at(layout, cursor_position) {
                     let pane_position = layout.position();
 
-                    let origin = cursor_position
-                        - Vector::new(pane_position.x, pane_position.y);
+                    let origin = cursor_position - Vector::new(pane_position.x, pane_position.y);
 
                     self.state.pick_pane(&pick_index, origin);
 
@@ -147,21 +142,12 @@ where
 
 #[derive(Debug, Clone, Copy)]
 pub enum DragEvent {
-    Picked {
-        pane: usize,
-    },
-    Dropped {
-        pane: usize,
-        target: usize,
-    },
-    Canceled {
-        pane: usize,
-    }
+    Picked { pane: usize },
+    Dropped { pane: usize, target: usize },
+    Canceled { pane: usize },
 }
 
-
-impl<'a, Message, Renderer> Widget<Message, Renderer>
-    for HList<'a, Message, Renderer>
+impl<'a, Message, Renderer> Widget<Message, Renderer> for HList<'a, Message, Renderer>
 where
     Renderer: self::Renderer + container::Renderer,
 {
@@ -173,12 +159,11 @@ where
         self.height
     }
 
-    fn layout(
-        &self,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let limits = limits.width(self.width).height(self.height).pad(self.padding);
+    fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+        let limits = limits
+            .width(self.width)
+            .height(self.height)
+            .pad(self.padding);
         let size = limits.resolve(Size::ZERO);
         let number_of_elements = self.elements.len();
 
@@ -189,11 +174,11 @@ where
             .filter_map(|(pane, element)| {
                 let area_width = size.width / number_of_elements as f32;
                 let region = Rectangle {
-                  x: ((pane as f32 * area_width) + self.spacing as f32).round(),
-                  y: 0.,
-                  width: area_width.round() - 2. * self.spacing as f32,
-                  height: size.height
-                }; 
+                    x: ((pane as f32 * area_width) + self.spacing as f32).round(),
+                    y: 0.,
+                    width: area_width.round() - 2. * self.spacing as f32,
+                    height: size.height,
+                };
 
                 let size = Size::new(region.width, region.height);
                 let mut node = element.layout(renderer, &layout::Limits::new(size, size));
@@ -225,7 +210,8 @@ where
         let mut event_status = event::Status::Ignored;
         let picked_pane = self.state.picked_pane().map(|(pane, _)| pane);
 
-        let items_event_status = self.elements
+        let items_event_status = self
+            .elements
             .iter_mut()
             .enumerate()
             .zip(content_layout.children())
@@ -245,12 +231,12 @@ where
             .fold(event_status, event::Status::merge);
 
         if items_event_status == event::Status::Captured {
-            return items_event_status
+            return items_event_status;
         } else {
             match event {
                 Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                     let bounds = content_layout.bounds();
-    
+
                     if bounds.contains(cursor_position) {
                         event_status = event::Status::Captured;
                         self.click_pane(content_layout, cursor_position, messages);
@@ -259,28 +245,25 @@ where
                 Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                     if let Some((pane, _)) = self.state.picked_pane() {
                         if let Some(on_drag) = &self.on_drag {
-                            let mut dropped_region =
-                                self.elements.iter().enumerate().zip(content_layout.children()).filter(
-                                    |(_, layout)| {
-                                        layout.bounds().contains(cursor_position)
-                                    },
-                                );
-    
+                            let mut dropped_region = self
+                                .elements
+                                .iter()
+                                .enumerate()
+                                .zip(content_layout.children())
+                                .filter(|(_, layout)| layout.bounds().contains(cursor_position));
+
                             let event = match dropped_region.next() {
-                                Some(((target,_), _)) if pane != target => {
-                                    DragEvent::Dropped {
-                                        pane,
-                                        target
-                                    }
+                                Some(((target, _), _)) if pane != target => {
+                                    DragEvent::Dropped { pane, target }
                                 }
                                 _ => DragEvent::Canceled { pane },
                             };
-    
+
                             messages.push(on_drag(event));
                         }
-    
+
                         self.state.idle();
-    
+
                         event_status = event::Status::Captured;
                     }
                 }
@@ -299,7 +282,6 @@ where
         cursor_position: Point,
         viewport: &Rectangle,
     ) -> Renderer::Output {
-
         self::Renderer::draw(
             renderer,
             defaults,
@@ -326,10 +308,7 @@ where
         }
     }
 
-    fn overlay(
-        &mut self,
-        layout: Layout<'_>,
-    ) -> Option<overlay::Element<'_, Message, Renderer>> {
+    fn overlay(&mut self, layout: Layout<'_>) -> Option<overlay::Element<'_, Message, Renderer>> {
         let content_layout = layout.children().next().unwrap();
 
         self.elements
@@ -339,7 +318,6 @@ where
             .next()
     }
 }
-
 
 pub trait Renderer: iced_native::Renderer + container::Renderer + Sized {
     type Style: Default;
@@ -378,15 +356,12 @@ pub trait Renderer: iced_native::Renderer + container::Renderer + Sized {
     ) -> Self::Output;
 }
 
-impl<'a, Message, Renderer> From<HList<'a, Message, Renderer>>
-    for Element<'a, Message, Renderer>
+impl<'a, Message, Renderer> From<HList<'a, Message, Renderer>> for Element<'a, Message, Renderer>
 where
     Renderer: 'a + self::Renderer + row::Renderer,
     Message: 'a,
 {
-    fn from(
-        pane_grid: HList<'a, Message, Renderer>,
-    ) -> Element<'a, Message, Renderer> {
+    fn from(pane_grid: HList<'a, Message, Renderer>) -> Element<'a, Message, Renderer> {
         Element::new(pane_grid)
     }
 }

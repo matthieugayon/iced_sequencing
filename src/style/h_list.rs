@@ -1,5 +1,5 @@
-use iced_native::{Color, Background};
 use super::color_utils::lighten;
+use iced_native::{Background, Color};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Style {

@@ -1,16 +1,13 @@
-use iced_graphics::{Backend, Primitive, Renderer, Color, defaults};
+use iced_graphics::{defaults, Backend, Color, Primitive, Renderer};
 use iced_native::{container, mouse};
-use iced_native::{Element, Layout, Point, Rectangle, Vector, Background};
+use iced_native::{Background, Element, Layout, Point, Rectangle, Vector};
 
 use crate::native::h_list;
 
-pub use crate::native::h_list::{
-  State, Content, TitleBar, DragEvent
-};
+pub use crate::native::h_list::{Content, DragEvent, State, TitleBar};
 pub use crate::style::h_list::{Style, StyleSheet};
 
-pub type HList<'a, Message, Backend> =
-    h_list::HList<'a, Message, Renderer<Backend>>;
+pub type HList<'a, Message, Backend> = h_list::HList<'a, Message, Renderer<Backend>>;
 
 impl<B> h_list::Renderer for Renderer<B>
 where
@@ -48,13 +45,8 @@ where
             .zip(content_layout.children())
             .enumerate()
             .map(|(id, (pane, layout))| {
-                let (primitive, new_mouse_interaction) = pane.draw(
-                    self,
-                    defaults,
-                    layout,
-                    pane_cursor_position,
-                    viewport,
-                );
+                let (primitive, new_mouse_interaction) =
+                    pane.draw(self, defaults, layout, pane_cursor_position, viewport);
 
                 if new_mouse_interaction > mouse_interaction {
                     mouse_interaction = new_mouse_interaction;
@@ -70,8 +62,7 @@ where
             })
             .collect();
 
-        let mut primitives = if let Some((index, layout, origin)) = dragged_pane
-        {
+        let mut primitives = if let Some((index, layout, origin)) = dragged_pane {
             let pane = panes.remove(index);
             let bounds = layout.bounds();
 
@@ -86,10 +77,7 @@ where
                 },
                 offset: Vector::new(0, 0),
                 content: Box::new(Primitive::Translate {
-                    translation: Vector::new(
-                        cursor_position.x - bounds.x - origin.x,
-                        0.,
-                    ),
+                    translation: Vector::new(cursor_position.x - bounds.x - origin.x, 0.),
                     content: Box::new(pane),
                 }),
             };
@@ -102,15 +90,18 @@ where
         };
 
         if style.background.is_some() || style.border_width > 0.0 {
-            primitives.insert(0, Primitive::Quad {
-                bounds,
-                background: style
-                    .background
-                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
-                border_radius: style.border_radius,
-                border_width: style.border_width,
-                border_color: style.border_color,
-            });
+            primitives.insert(
+                0,
+                Primitive::Quad {
+                    bounds,
+                    background: style
+                        .background
+                        .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                    border_radius: style.border_radius,
+                    border_width: style.border_width,
+                    border_color: style.border_color,
+                },
+            );
         }
 
         (
@@ -143,8 +134,7 @@ where
 
         if let Some((title_bar, title_bar_layout)) = title_bar {
             let show_controls = bounds.contains(cursor_position);
-            let is_over_pick_area =
-                title_bar.is_over_pick_area(title_bar_layout, cursor_position);
+            let is_over_pick_area = title_bar.is_over_pick_area(title_bar_layout, cursor_position);
 
             let (title_bar_primitive, title_bar_interaction) = title_bar.draw(
                 self,
@@ -206,22 +196,12 @@ where
 
         let background = background(bounds, &style);
 
-        let (title_primitive, title_interaction) = title_content.draw(
-            self,
-            &defaults,
-            title_layout,
-            cursor_position,
-            viewport,
-        );
+        let (title_primitive, title_interaction) =
+            title_content.draw(self, &defaults, title_layout, cursor_position, viewport);
 
         if let Some((controls, controls_layout)) = controls {
-            let (controls_primitive, controls_interaction) = controls.draw(
-                self,
-                &defaults,
-                controls_layout,
-                cursor_position,
-                viewport,
-            );
+            let (controls_primitive, controls_interaction) =
+                controls.draw(self, &defaults, controls_layout, cursor_position, viewport);
 
             (
                 Primitive::Group {
@@ -248,10 +228,7 @@ where
     }
 }
 
-fn background(
-    bounds: Rectangle,
-    style: &iced_style::container::Style,
-) -> Option<Primitive> {
+fn background(bounds: Rectangle, style: &iced_style::container::Style) -> Option<Primitive> {
     if style.background.is_some() || style.border_width > 0.0 {
         Some(Primitive::Quad {
             bounds,

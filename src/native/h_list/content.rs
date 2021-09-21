@@ -1,8 +1,8 @@
-use super::title_bar::TitleBar;
 use super::super::h_list;
+use super::title_bar::TitleBar;
 use iced_native::{
-    Clipboard, Element, Hasher, Layout, Point, Rectangle, Size,
-    overlay, layout, Event, event, container
+    container, event, layout, overlay, Clipboard, Element, Event, Hasher, Layout, Point, Rectangle,
+    Size,
 };
 
 /// The content of a [`Pane`].
@@ -29,19 +29,13 @@ where
     }
 
     /// Sets the [`TitleBar`] of this [`Content`].
-    pub fn title_bar(
-        mut self,
-        title_bar: TitleBar<'a, Message, Renderer>,
-    ) -> Self {
+    pub fn title_bar(mut self, title_bar: TitleBar<'a, Message, Renderer>) -> Self {
         self.title_bar = Some(title_bar);
         self
     }
 
     /// Sets the style of the [`Content`].
-    pub fn style(
-        mut self,
-        style: impl Into<<Renderer as container::Renderer>::Style>,
-    ) -> Self {
+    pub fn style(mut self, style: impl Into<<Renderer as container::Renderer>::Style>) -> Self {
         self.style = style.into();
         self
     }
@@ -91,11 +85,7 @@ where
 
     /// Returns whether the [`Content`] with the given [`Layout`] can be picked
     /// at the provided cursor position.
-    pub fn can_be_picked_at(
-        &self,
-        layout: Layout<'_>,
-        cursor_position: Point,
-    ) -> bool {
+    pub fn can_be_picked_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
         // if let Some(title_bar) = &self.title_bar {
         //     let mut children = layout.children();
         //     let title_bar_layout = children.next().unwrap();
@@ -108,16 +98,12 @@ where
         layout.bounds().contains(cursor_position)
     }
 
-    pub(crate) fn layout(
-        &self,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    pub(crate) fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         if let Some(title_bar) = &self.title_bar {
             let max_size = limits.max();
 
-            let title_bar_layout = title_bar
-                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+            let title_bar_layout =
+                title_bar.layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
 
             let title_bar_size = title_bar_layout.size();
 
@@ -125,19 +111,13 @@ where
                 renderer,
                 &layout::Limits::new(
                     Size::ZERO,
-                    Size::new(
-                        max_size.width,
-                        max_size.height - title_bar_size.height,
-                    ),
+                    Size::new(max_size.width, max_size.height - title_bar_size.height),
                 ),
             );
 
             body_layout.move_to(Point::new(0.0, title_bar_size.height));
 
-            layout::Node::with_children(
-                max_size,
-                vec![title_bar_layout, body_layout],
-            )
+            layout::Node::with_children(max_size, vec![title_bar_layout, body_layout])
         } else {
             self.body.layout(renderer, limits)
         }

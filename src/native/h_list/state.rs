@@ -3,16 +3,19 @@ use iced_native::Point;
 #[derive(Debug, Clone)]
 pub struct State<T> {
     pub(super) panes: Vec<T>,
-    pub(super) internal: Internal
+    pub(super) internal: Internal,
 }
 
-impl<T> State<T> where T: Clone {
+impl<T> State<T>
+where
+    T: Clone,
+{
     pub fn new(panes: Vec<T>) -> Self {
         Self {
             panes: panes.clone(),
             internal: Internal {
-                action: Action::Idle
-            }
+                action: Action::Idle,
+            },
         }
     }
 
@@ -61,7 +64,7 @@ pub struct Internal {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Action {
     Idle,
-    Dragging { index: usize, origin: Point }
+    Dragging { index: usize, origin: Point },
 }
 
 impl Internal {

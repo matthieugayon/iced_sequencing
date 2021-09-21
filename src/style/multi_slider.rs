@@ -1,5 +1,5 @@
-use iced_native::{Color, Background};
 use super::color_utils::{darken, lighten};
+use iced_native::{Background, Color};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Style {
@@ -7,14 +7,14 @@ pub struct Style {
     pub border_radius: f32,
     pub border_width: f32,
     pub border_color: Color,
-    pub slider: Slider
+    pub slider: Slider,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Slider {
     pub color: Color,
     pub marker_height: f32,
-    pub marker_color: Color
+    pub marker_color: Color,
 }
 
 pub trait StyleSheet {
@@ -36,8 +36,8 @@ impl StyleSheet for Default {
             slider: Slider {
                 color: primary_color,
                 marker_height: 1.,
-                marker_color: primary_color
-            }
+                marker_color: primary_color,
+            },
         }
     }
 
@@ -50,24 +50,24 @@ impl StyleSheet for Default {
             slider: Slider {
                 color: darken(primary_color, 0.1),
                 marker_height: 1.,
-                marker_color: primary_color
-            }
+                marker_color: primary_color,
+            },
         }
     }
 
     fn highlight(&self, primary_color: Color) -> Slider {
         Slider {
-            color:  primary_color,
+            color: primary_color,
             marker_height: 1.,
-            marker_color: primary_color
+            marker_color: primary_color,
         }
     }
 
     fn hovered(&self, primary_color: Color) -> Slider {
         Slider {
-            color:  lighten(primary_color, 0.1),
+            color: lighten(primary_color, 0.1),
             marker_height: 1.,
-            marker_color: primary_color
+            marker_color: primary_color,
         }
     }
 }

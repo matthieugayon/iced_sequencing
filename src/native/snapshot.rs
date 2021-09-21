@@ -1,12 +1,12 @@
 use iced_native::{
-    layout, Element, Hasher, Layout, Event, Clipboard, Padding,
-    Length, Point, Rectangle, Size, Widget, overlay, event
+    event, layout, overlay, Clipboard, Element, Event, Hasher, Layout, Length, Padding, Point,
+    Rectangle, Size, Widget,
 };
 
-use std::hash::Hash;
 use ganic_no_std::pattern::Pattern;
+use std::hash::Hash;
 
-use crate::core::grid::GridPattern; 
+use crate::core::grid::GridPattern;
 
 pub use crate::style::snapshot::{Style, StyleSheet};
 
@@ -18,7 +18,7 @@ pub struct Snapshot<'a, Message, Renderer: self::Renderer> {
     style: Renderer::Style,
     padding: Padding,
     controls: Option<Element<'a, Message, Renderer>>,
-    always_show_controls: bool
+    always_show_controls: bool,
 }
 
 impl<'a, Message, Renderer> Snapshot<'a, Message, Renderer>
@@ -26,19 +26,11 @@ where
     Message: Clone,
     Renderer: self::Renderer,
 {
-    pub fn new(
-        pattern: Option<Pattern>,
-        width: Length,
-        height: Length
-    ) -> Self {
-        let pattern= {
+    pub fn new(pattern: Option<Pattern>, width: Length, height: Length) -> Self {
+        let pattern = {
             match pattern {
-                Some(pattern) => {
-                    GridPattern::from(pattern)
-                }
-                None => {
-                    GridPattern::new()
-                }
+                Some(pattern) => GridPattern::from(pattern),
+                None => GridPattern::new(),
             }
         };
 
@@ -50,7 +42,7 @@ where
             style: Renderer::Style::default(),
             padding: Padding::ZERO,
             controls: None,
-            always_show_controls: false
+            always_show_controls: false,
         }
     }
 
@@ -84,10 +76,7 @@ where
         self
     }
 
-    pub fn controls(
-        mut self,
-        controls: impl Into<Element<'a, Message, Renderer>>,
-    ) -> Self {
+    pub fn controls(mut self, controls: impl Into<Element<'a, Message, Renderer>>) -> Self {
         self.controls = Some(controls.into());
         self
     }
@@ -98,9 +87,7 @@ where
     }
 }
 
-
-impl<'a, Message, Renderer> Widget<Message, Renderer>
-    for Snapshot<'a, Message, Renderer>
+impl<'a, Message, Renderer> Widget<Message, Renderer> for Snapshot<'a, Message, Renderer>
 where
     Message: Clone,
     Renderer: self::Renderer,
@@ -113,34 +100,27 @@ where
         self.height
     }
 
-    fn layout(
-        &self,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
-        let limits = limits.width(self.width).height(self.height).pad(self.padding);
+    fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+        let limits = limits
+            .width(self.width)
+            .height(self.height)
+            .pad(self.padding);
         let size = limits.resolve(Size::ZERO);
 
         let mut node = if let Some(controls) = &self.controls {
-            let mut controls_layout = controls
-                .layout(renderer, &layout::Limits::new(Size::ZERO, size));
+            let mut controls_layout =
+                controls.layout(renderer, &layout::Limits::new(Size::ZERO, size));
 
             let controls_size = controls_layout.size();
             let space_before_controls = size.width - controls_size.width;
 
             controls_layout.move_to(Point::new(space_before_controls, 0.0));
 
-            layout::Node::with_children(
-                size,
-                vec![controls_layout],
-            )  
+            layout::Node::with_children(size, vec![controls_layout])
         } else {
-            layout::Node::with_children(
-                size,
-                Vec::new(),
-            )
-        };     
-        
+            layout::Node::with_children(size, Vec::new())
+        };
+
         node.move_to(Point::new(
             self.padding.left.into(),
             self.padding.top.into(),
@@ -192,7 +172,7 @@ where
             &self.style,
             controls,
             cursor_position,
-            viewport
+            viewport,
         )
     }
 
@@ -228,10 +208,7 @@ where
         }
     }
 
-    fn overlay(
-        &mut self,
-        layout: Layout<'_>,
-    ) -> Option<overlay::Element<'_, Message, Renderer>> {
+    fn overlay(&mut self, layout: Layout<'_>) -> Option<overlay::Element<'_, Message, Renderer>> {
         let mut children = layout.children();
         let padded = children.next().unwrap();
 
@@ -245,10 +222,8 @@ where
             Some(ctr) => {
                 let controls_layout = children.next()?;
                 ctr.overlay(controls_layout)
-            },
-            None => {
-                None
-            },
+            }
+            None => None,
         }
     }
 }
@@ -264,20 +239,16 @@ pub trait Renderer: iced_native::Renderer {
         style: &Self::Style,
         controls: Option<(&Element<'_, Message, Self>, Layout<'_>)>,
         cursor_position: Point,
-        viewport: &Rectangle
+        viewport: &Rectangle,
     ) -> Self::Output;
 }
 
-
-impl<'a, Message, Renderer> From<Snapshot<'a, Message, Renderer>>
-    for Element<'a, Message, Renderer>
+impl<'a, Message, Renderer> From<Snapshot<'a, Message, Renderer>> for Element<'a, Message, Renderer>
 where
     Message: 'a + Clone,
     Renderer: 'a + self::Renderer,
 {
-    fn from(
-        snapshot: Snapshot<'a, Message, Renderer>,
-    ) -> Element<'a, Message, Renderer> {
+    fn from(snapshot: Snapshot<'a, Message, Renderer>) -> Element<'a, Message, Renderer> {
         Element::new(snapshot)
     }
 }

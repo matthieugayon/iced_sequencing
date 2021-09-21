@@ -1,23 +1,17 @@
 use crate::{core::grid::GridEvent, native::grid};
+use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
-use iced_native::{mouse, Background, Point, Rectangle, Color, Size};
-use crate::core::grid::{
-    get_step_dimensions,
-    get_event_absolute_position,
-    GridPattern,
-    TRACK_MARGIN_BOTTOM,
-    CONTAINER_PADDING_LEFT,
-    CONTAINER_PADDING_TOP
-};
+
+use crate::core::grid::{get_event_bounds, get_step_dimensions, GridPattern, TRACK_MARGIN_BOTTOM};
+use iced_native::{mouse, Background, Color, Point, Rectangle, Size, Vector};
 
 pub use crate::native::grid::State;
+pub use crate::style::color_utils::{darken, lighten};
 pub use crate::style::grid::{Style, StyleSheet};
-pub use crate::style::color_utils::{lighten,darken};
 
 use ganic_no_std::{NUM_PERCS, NUM_STEPS};
 
-pub type Grid<'a, Message, Backend> =
-    grid::Grid<'a, Message, Renderer<Backend>>;
+pub type Grid<'a, Message, Backend> = grid::Grid<'a, Message, Renderer<Backend>>;
 
 impl<B: Backend> grid::Renderer for Renderer<B> {
     type Style = Box<dyn StyleSheet>;
@@ -25,278 +19,296 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
     fn draw(
         &mut self,
         bounds: Rectangle,
+        drawable_area: Rectangle,
         _cursor_position: Point,
-        grid_pattern: GridPattern,
+        grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
         mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
-        style_sheet: &Self::Style
+        style_sheet: &Self::Style,
+        grid_cache: &Cache,
+        event_cache: &Cache,
+        highlight_cache: &Cache,
     ) -> Self::Output {
-
         let style = style_sheet.default();
+        let step_size = get_step_dimensions(drawable_area.size());
 
-        let step_size = get_step_dimensions(bounds);
+        let grid = grid_cache.draw(drawable_area.size(), |frame| {
+            draw_grid(
+                frame,
+                drawable_area.size(),
+                step_size,
+                is_playing,
+                highlight,
+                &style,
+            )
+        });
+        let steps = event_cache.draw(drawable_area.size(), |frame| {
+            draw_steps(
+                frame,
+                drawable_area.size(),
+                grid_pattern,
+                step_size,
+                is_playing,
+                highlight,
+                &style,
+            )
+        });
 
-        let ceiled_bounds = Rectangle {
-            x: bounds.x.ceil(),
-            y: bounds.y.ceil(),
-            width: bounds.width.ceil(),
-            height: bounds.height.ceil()
-        };
-
-        let grid = draw_grid(ceiled_bounds, step_size, is_playing, highlight, &style);
-        let steps = draw_steps(grid_pattern, ceiled_bounds, step_size, is_playing, highlight, &style);
-        let mut primitives = vec![grid, steps];
+        let mut primitives = vec![grid.into_primitive(), steps.into_primitive()];
 
         match selection {
             Some(selection) => {
-                primitives.push(draw_selection(ceiled_bounds, selection, &style));
+                primitives.push(draw_selection(selection, drawable_area, &style));
             }
             None => {}
         }
 
         (
-            Primitive::Group {
-                primitives
+            Primitive::Translate {
+                translation: Vector::new(drawable_area.x, drawable_area.y),
+                content: Box::new(Primitive::Group { primitives }),
             },
             mouse_interaction,
         )
     }
 }
 
-fn draw_selection(bounds: Rectangle, area: Rectangle, style: &Style) -> Primitive {
-    let bounds = Rectangle {
-        x: area.x + bounds.x,
-        y: area.y + bounds.y,
-        width: area.width,
-        height: area.height
+fn draw_selection(selection: Rectangle, bounds: Rectangle, style: &Style) -> Primitive {
+    let mut frame = Frame::new(bounds.size());
+
+    let top_left = Point {
+        x: selection.x - bounds.x,
+        y:  selection.y - bounds.y
     };
 
-    Primitive::Quad {
-        bounds,
-        background: Background::Color(Color::TRANSPARENT),
-        border_radius: 0.0,
-        border_width: 1.0,
-        border_color: style.selection_border_color
-    }
+    let area = Path::rectangle(top_left, selection.size());
+
+    frame.stroke(
+        &area,
+        Stroke {
+            width: 1.,
+            color: style.selection_border_color,
+            line_cap: LineCap::Square,
+            ..Stroke::default()
+        },
+    );
+
+    Geometry::into_primitive(frame.into_geometry())
 }
 
-fn draw_grid(bounds: Rectangle, step_size: Size, is_playing: bool, highlight: [usize; NUM_PERCS], style: &Style) -> Primitive {
-    let mut primitives:Vec<Primitive> = vec![];
+fn draw_grid(
+    frame: &mut Frame,
+    size: Size,
+    step_size: Size,
+    is_playing: bool,
+    highlight: [usize; NUM_PERCS],
+    style: &Style,
+) {
+    for track in 0..NUM_PERCS {
+        let track_origin = Point {
+            x: 0.,
+            y: track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM),
+        };
+        let track_size = Size {
+            width: size.width,
+            height: step_size.height,
+        };
 
-    // now render grid
+        let track_bg = Path::rectangle(track_origin, track_size);
+
+        frame.fill(&track_bg, style.step_bg_color_2);
+
+        let offset_origin = Point {
+            x: 0.,
+            y: track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM) + step_size.height as f32,
+        };
+
+        let offset_size = Size {
+            width: size.width,
+            height: TRACK_MARGIN_BOTTOM,
+        };
+
+        let offset_bg = Path::rectangle(offset_origin, offset_size);
+
+        frame.fill(&offset_bg, style.step_bg_color);
+    }
+
     for step in 0..NUM_STEPS {
-        for track in 0..NUM_PERCS {
-            let step_offset_x = CONTAINER_PADDING_LEFT + (step as f32 * step_size.width);
-            let step_offset_y = CONTAINER_PADDING_TOP + (track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM));
+        let step_offset_x = (step + 1) as f32 * step_size.width;
 
-            let step_group = step / 8;
-            let first_group = step_group == 0 || step_group == 2;
+        let step_line = Path::line(
+            Point {
+                x: step_offset_x,
+                y: 0.,
+            },
+            Point {
+                x: step_offset_x,
+                y: size.height,
+            },
+        );
 
-            primitives.push(
-                Primitive::Group {
-                    primitives: vec![
-                        Primitive::Quad {
-                            bounds: Rectangle{
-                                x: step_offset_x + bounds.x,
-                                y: step_offset_y + bounds.y,
-                                width: step_size.width,
-                                height: step_size.height
-                            },
-                            background: Background::Color(
-                                if highlight[track] == step && is_playing {
-                                    style.step_highlight_bg_color
-                                } else if first_group { 
-                                    style.step_bg_color 
-                                } else { 
-                                    style.step_bg_color_2 
-                                }
-                            ),
-                            border_radius: 0.0,
-                            border_width: 0.0,
-                            border_color: Color::TRANSPARENT,
-                        },
-                        // border left
-                        Primitive::Quad {
-                            bounds: Rectangle{
-                                x: step_offset_x + bounds.x,
-                                y: step_offset_y + bounds.y,
-                                width: 1.,
-                                height: step_size.height
-                            },
-                            background: Background::Color(if step % 2 == 0 { style.step_border_left_color_2 } else { style.step_border_left_color }),
-                            border_radius: 0.0,
-                            border_width: 0.0,
-                            border_color: Color::TRANSPARENT,
-                        }
-                    ]
-                }
-            )
-        }
-    }
-
-    Primitive::Group {
-        primitives
+        frame.stroke(
+            &step_line,
+            Stroke {
+                width: 1.,
+                color: style.step_border_left_color_2,
+                line_cap: LineCap::Square,
+                ..Stroke::default()
+            },
+        );
     }
 }
 
-fn draw_steps(grid_pattern: GridPattern, bounds: Rectangle, step_size: Size, is_playing: bool, highlight: [usize; NUM_PERCS], style: &Style) -> Primitive {
-    let normalized_bounds = Rectangle {
-        x: 0.0,
-        y: 0.0,
-        width: bounds.width,
-        height: bounds.height
-    };
-
-    let mut events: Vec<(usize, usize, GridEvent)> = grid_pattern.data
+fn draw_steps(
+    frame: &mut Frame,
+    size: Size,
+    grid_pattern: &GridPattern,
+    step_size: Size,
+    is_playing: bool,
+    highlight: [usize; NUM_PERCS],
+    style: &Style,
+) {
+    let mut events: Vec<(usize, usize, GridEvent)> = grid_pattern
+        .data
         .iter()
-        .map(|((step, track), grid_event)| {
-            (*step, *track, *grid_event)
-        })
+        .map(|((step, track), grid_event)| (*step, *track, *grid_event))
         .collect();
 
-    events.sort_by(|x,y| {
+    events.sort_by(|x, y| {
         if x.1 == y.1 {
-            return x.0.cmp(&y.0)
+            return x.0.cmp(&y.0);
         }
         x.1.cmp(&y.1)
     });
 
-    let selected_events: Vec<&(usize, usize, GridEvent)> = events
-        .iter()
-        .filter(|(_, _, e)| e.selected)
-        .collect();
+    let selected_events: Vec<&(usize, usize, GridEvent)> =
+        events.iter().filter(|(_, _, e)| e.selected).collect();
 
-    let mut sorted_events: Vec<&(usize, usize, GridEvent)> = events
-        .iter()
-        .filter(|(_, _, e)| !e.selected)
-        .collect();
+    let mut sorted_events: Vec<&(usize, usize, GridEvent)> =
+        events.iter().filter(|(_, _, e)| !e.selected).collect();
 
     sorted_events.extend_from_slice(&selected_events);
 
-    Primitive::Group {
-        primitives: sorted_events.iter()
-            .map(|(step, track, grid_event)| {
-                let event_position = get_event_absolute_position(*step, *track, grid_event.offset, normalized_bounds);
-                let step_position = get_event_absolute_position(*step, *track, 0., normalized_bounds);
-                let event_offset_y = CONTAINER_PADDING_TOP + (*track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM));
+    sorted_events.iter().for_each(|(step, track, grid_event)| {
+        let event_bounds = get_event_bounds(*step, *track, grid_event.offset, size);
+        let step_position = get_event_bounds(*step, *track, 0., size);
 
-                let mut primitives: Vec<Primitive> = vec![];
-                let bg_color = {
-                    if highlight[*track] == *step && is_playing {
-                        *style.event_highlight_bg_color.get(track).unwrap()
-                    } else {
-                        *style.event_bg_color.get(track).unwrap()
-                    }
-                };
-                
-                if grid_event.selected {
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x,
-                            y: event_offset_y + bounds.y,
-                            width: step_size.width,
-                            height: step_size.height,
-                        },
-                        background: Background::Color(style.event_selected_border_color),
-                        border_radius: 0.,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    });
+        let bg_color = {
+            if highlight[*track] == *step && is_playing {
+                *style.event_highlight_bg_color.get(track).unwrap()
+            } else {
+                *style.event_bg_color.get(track).unwrap()
+            }
+        };
 
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x + 2.,
-                            y: event_offset_y + bounds.y + 2.,
-                            width: step_size.width - 4.,
-                            height: step_size.height - 4.,
-                        },
-                        background: Background::Color(lighten(bg_color, 0.2)),
-                        border_radius: 0.,
-                        border_width: 1.,
-                        border_color: Color::from_rgb(0.36, 0.36, 0.3)
-                    });
+        if grid_event.selected {
+            let selected_countour = Path::rectangle(
+                Point {
+                    x: event_bounds.x,
+                    y: event_bounds.y,
+                },
+                step_size,
+            );
+            frame.fill(&selected_countour, style.event_selected_border_color);
 
-                    let slider_inner_height = step_size.height - 6.;
-                    let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
-                    let velocity_top_offset = slider_inner_height - velocity_height;
+            let event = Path::rectangle(
+                Point {
+                    x: event_bounds.x + 2.,
+                    y: event_bounds.y + 2.,
+                },
+                Size {
+                    width: step_size.width - 4.,
+                    height: step_size.height - 4.,
+                },
+            );
+            frame.fill(&event, lighten(bg_color, 0.2));
+            frame.stroke(
+                &event,
+                Stroke {
+                    width: 1.,
+                    color: Color::from_rgb(0.36, 0.36, 0.3),
+                    line_cap: LineCap::Square,
+                    ..Stroke::default()
+                },
+            );
 
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x + 3.,
-                            y: event_offset_y + bounds.y + 3. + velocity_top_offset,
-                            width: step_size.width - 6.,
-                            height: velocity_height,
-                        },
-                        background: Background::Color(darken(bg_color, 0.1)),
-                        border_radius: 0.,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    })
+            let slider_inner_height = step_size.height - 6.;
+            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+            let velocity_top_offset = slider_inner_height - velocity_height;
 
-                } else {
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x,
-                            y: event_offset_y + bounds.y,
-                            width: step_size.width,
-                            height: step_size.height,
-                        },
-                        background: Background::Color(lighten(bg_color, 0.2)),
-                        border_radius: 0.,
-                        border_width: 0.,
-                        border_color: style.event_border_color
-                    });
+            let inner_slider = Path::rectangle(
+                Point {
+                    x: event_bounds.x + 3.,
+                    y: event_bounds.y + 3. + velocity_top_offset,
+                },
+                Size {
+                    width: step_size.width - 6.,
+                    height: velocity_height,
+                },
+            );
+            frame.fill(&inner_slider, darken(bg_color, 0.1));
+        } else {
+            let event = Path::rectangle(
+                Point {
+                    x: event_bounds.x,
+                    y: event_bounds.y,
+                },
+                step_size,
+            );
+            frame.fill(&event, lighten(bg_color, 0.2));
+            frame.stroke(
+                &event,
+                Stroke {
+                    width: 1.,
+                    color: style.event_border_color,
+                    line_cap: LineCap::Square,
+                    ..Stroke::default()
+                },
+            );
 
-                    let slider_inner_height = step_size.height - 2.;
-                    let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
-                    let velocity_top_offset = slider_inner_height - velocity_height;
+            let slider_inner_height = step_size.height - 2.;
+            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+            let velocity_top_offset = slider_inner_height - velocity_height;
 
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x + 1.,
-                            y: event_offset_y + bounds.y + 1. + velocity_top_offset,
-                            width: step_size.width - 2.,
-                            height: velocity_height,
-                        },
-                        background: Background::Color(darken(bg_color, 0.1)),
-                        border_radius: 0.,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    })
-                }
+            let inner_slider = Path::rectangle(
+                Point {
+                    x: event_bounds.x + 1.,
+                    y: event_bounds.y + 1. + velocity_top_offset,
+                },
+                Size {
+                    width: step_size.width - 2.,
+                    height: velocity_height,
+                },
+            );
+            frame.fill(&inner_slider, darken(bg_color, 0.1));
+        }
 
-                if grid_event.offset > 0. {
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: 1. + step_position.x + bounds.x,
-                            y: event_offset_y + bounds.y + step_size.height,
-                            width: event_position.x - step_position.x - 1.,
-                            height: 2.,
-                        },
-                        background:  Background::Color(style.event_marker_color.0),
-                        border_radius: 0.0,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    })
-                } else if grid_event.offset < 0. {
-                    primitives.push(Primitive::Quad {
-                        bounds: Rectangle{
-                            x: event_position.x + bounds.x,
-                            y: event_offset_y + bounds.y + step_size.height,
-                            width: step_position.x - event_position.x,
-                            height: 2.,
-                        },
-                        background: Background::Color(style.event_marker_color.1),
-                        border_radius: 0.0,
-                        border_width: 0.,
-                        border_color: Color::TRANSPARENT
-                    })
-                }
-
-                Primitive::Group { primitives }
-            })
-            .collect()
-    }
+        if grid_event.offset > 0. {
+            let offset = Path::rectangle(
+                Point {
+                    x: 1. + event_bounds.x,
+                    y: event_bounds.y + step_size.height,
+                },
+                Size {
+                    width: event_bounds.x - step_position.x - 1.,
+                    height: 2.,
+                },
+            );
+            frame.fill(&offset, style.event_marker_color.0);
+        } else if grid_event.offset < 0. {
+            let offset = Path::rectangle(
+                Point {
+                    x: event_bounds.x,
+                    y: event_bounds.y + step_size.height,
+                },
+                Size {
+                    width: step_position.x - event_bounds.x,
+                    height: 2.,
+                },
+            );
+            frame.fill(&offset, style.event_marker_color.1);
+        }
+    });
 }

@@ -6,10 +6,10 @@ pub use idle::Idle;
 pub use logo::Logo;
 pub use shift::Shift;
 
-use std::fmt::Debug;
-use iced_native::{keyboard, Rectangle, Point};
 use super::WidgetContext;
-use crate::core::grid::GridMessage;
+use crate::core::grid::{GridMessage, GridPattern};
+use iced_native::{keyboard, Point, Rectangle};
+use std::fmt::Debug;
 
 pub trait WidgetState: Debug {
     fn on_cancelled(&mut self, _context: &mut WidgetContext) {}
@@ -18,7 +18,8 @@ pub trait WidgetState: Debug {
         &mut self,
         _bounds: Rectangle,
         _cursor: Point,
-        _context: &mut WidgetContext
+        _base_pattern: GridPattern,
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -27,7 +28,8 @@ pub trait WidgetState: Debug {
         &mut self,
         _bounds: Rectangle,
         _cursor: Point,
-        _context: &mut WidgetContext
+        _base_pattern: GridPattern,
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -36,7 +38,8 @@ pub trait WidgetState: Debug {
         &mut self,
         _bounds: Rectangle,
         _cursor: Point,
-        _context: &mut WidgetContext
+        _base_pattern: GridPattern,
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -45,7 +48,8 @@ pub trait WidgetState: Debug {
         &mut self,
         _bounds: Rectangle,
         _cursor: Point,
-        _context: &mut WidgetContext
+        _base_pattern: GridPattern,
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -53,7 +57,7 @@ pub trait WidgetState: Debug {
     fn on_key_pressed(
         &mut self,
         _key_code: keyboard::KeyCode,
-        _context: &mut WidgetContext
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -61,7 +65,7 @@ pub trait WidgetState: Debug {
     fn on_key_released(
         &mut self,
         _key_code: keyboard::KeyCode,
-        _context: &mut WidgetContext
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
@@ -69,17 +73,13 @@ pub trait WidgetState: Debug {
     fn on_modifier_change(
         &mut self,
         _modifiers: keyboard::Modifiers,
-        _context: &mut WidgetContext
+        _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, None)
     }
 
-    fn next(
-       &mut self,
-       _next_state: Box<dyn WidgetState + Send>
-    ) {}
+    fn next(&mut self, _next_state: Box<dyn WidgetState + Send>) {}
 }
-
 
 #[derive(Debug)]
 pub enum Transition {
@@ -87,4 +87,3 @@ pub enum Transition {
     ChangeParentState(Box<dyn WidgetState + Send>),
     DoNothing,
 }
-

@@ -1,10 +1,10 @@
-use iced_native::{Rectangle, mouse, Background, Color, Point};
-use iced_graphics::{Backend, Renderer, Primitive};
+use iced_graphics::{Backend, Primitive, Renderer};
+use iced_native::{mouse, Background, Color, Point, Rectangle};
 
 use crate::native::multi_slider;
 pub use crate::native::multi_slider::State;
 
-pub use crate::style::multi_slider::{Style, StyleSheet, Slider};
+pub use crate::style::multi_slider::{Slider, Style, StyleSheet};
 
 pub type MultiSlider<'a, T, Message, Backend> =
     multi_slider::MultiSlider<'a, T, Message, Renderer<Backend>>;
@@ -25,14 +25,14 @@ where
         active: Option<usize>,
         spacing: u16,
         base_color: Color,
-        style_sheet: &Self::Style
+        style_sheet: &Self::Style,
     ) -> Self::Output {
         let style = style_sheet.default(base_color);
         let highlight_slider_style = style_sheet.highlight(base_color);
         let hovered_slider_style = style_sheet.hovered(base_color);
         let slider_width = content_bounds.width / values.len() as f32;
         let (range_start, range_end) = range.into_inner();
-        
+
         let mut primitives = vec![];
 
         if style.background.is_some() || style.border_width > 0.0 {
@@ -47,71 +47,75 @@ where
             });
         }
 
-        primitives.push(
-            Primitive::Group {
-                primitives: values
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        let ranged_value = if range_start >= range_end {
-                            0.0
-                        } else {
-                            (value - range_start) / (range_end - range_start)
-                        };
-                        let slider_height = content_bounds.height * ranged_value;
+        primitives.push(Primitive::Group {
+            primitives: values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    let ranged_value = if range_start >= range_end {
+                        0.0
+                    } else {
+                        (value - range_start) / (range_end - range_start)
+                    };
+                    let slider_height = content_bounds.height * ranged_value;
 
-                        let slider_range_bounds = Rectangle {
-                            x: content_bounds.x + index as f32 * slider_width,
-                            y: content_bounds.y,
-                            width: slider_width,
-                            height: content_bounds.height,
-                        };
-                        let slider_bounds = Rectangle {
-                            x: (content_bounds.x + index as f32 * slider_width + spacing as f32).round(),
-                            y: content_bounds.y + content_bounds.height - slider_height,
-                            width: (slider_width - 2. * spacing as f32).round(),
-                            height: slider_height,
-                        };
+                    let slider_range_bounds = Rectangle {
+                        x: content_bounds.x + index as f32 * slider_width,
+                        y: content_bounds.y,
+                        width: slider_width,
+                        height: content_bounds.height,
+                    };
+                    let slider_bounds = Rectangle {
+                        x: (content_bounds.x + index as f32 * slider_width + spacing as f32)
+                            .round(),
+                        y: content_bounds.y + content_bounds.height - slider_height,
+                        width: (slider_width - 2. * spacing as f32).round(),
+                        height: slider_height,
+                    };
 
-                        let slider_style = match active {
-                            Some(active_slider) => {
-                                if slider_range_bounds.contains(cursor_position) {
-                                    hovered_slider_style
-                                } else if active_slider == index {
-                                    highlight_slider_style
-                                } else {
-                                    style.slider
-                                }
-                            },
-                            None => {
-                                if slider_range_bounds.contains(cursor_position) {
-                                    hovered_slider_style
-                                } else {
-                                    style.slider
-                                }
-                            },
-                        };
+                    let slider_style = match active {
+                        Some(active_slider) => {
+                            if slider_range_bounds.contains(cursor_position) {
+                                hovered_slider_style
+                            } else if active_slider == index {
+                                highlight_slider_style
+                            } else {
+                                style.slider
+                            }
+                        }
+                        None => {
+                            if slider_range_bounds.contains(cursor_position) {
+                                hovered_slider_style
+                            } else {
+                                style.slider
+                            }
+                        }
+                    };
 
-                        let slider_bar = Primitive::Quad {
-                            bounds: slider_bounds,
-                            background: Background::Color(slider_style.color),
-                            border_radius: 0.0,
-                            border_width: 0.0,
-                            border_color: Color::TRANSPARENT
-                        };
+                    let slider_bar = Primitive::Quad {
+                        bounds: slider_bounds,
+                        background: Background::Color(slider_style.color),
+                        border_radius: 0.0,
+                        border_width: 0.0,
+                        border_color: Color::TRANSPARENT,
+                    };
 
-                        let slider_primitives = vec![slider_bar];
+                    let slider_primitives = vec![slider_bar];
 
-                        // if slider_style.marker_height > 0. {
+                    // if slider_style.marker_height > 0. {
 
-                        // }
-        
-                        Primitive::Group { primitives: slider_primitives }
-                    })
-                    .collect()
-            }
-        );
+                    // }
 
-        (Primitive::Group { primitives }, mouse::Interaction::default())
+                    Primitive::Group {
+                        primitives: slider_primitives,
+                    }
+                })
+                .collect(),
+        });
+
+        (
+            Primitive::Group { primitives },
+            mouse::Interaction::default(),
+        )
     }
 }

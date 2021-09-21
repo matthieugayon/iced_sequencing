@@ -1,7 +1,6 @@
 use iced_native::{
-    Widget, Length, layout, Size, event, 
-    Event, mouse, Point, Layout, Clipboard, 
-    Element, Rectangle, Hasher, Color, touch, Padding
+    event, layout, mouse, touch, Clipboard, Color, Element, Event, Hasher, Layout, Length, Padding,
+    Point, Rectangle, Size, Widget,
 };
 use std::{hash::Hash, ops::RangeInclusive};
 
@@ -19,7 +18,7 @@ pub struct MultiSlider<'a, T, Message, Renderer: self::Renderer> {
     spacing: u16,
     padding: Padding,
     base_color: Color,
-    style: Renderer::Style
+    style: Renderer::Style,
 }
 
 impl<'a, T, Message, Renderer> MultiSlider<'a, T, Message, Renderer>
@@ -33,12 +32,13 @@ where
         range: RangeInclusive<T>,
         values: Vec<T>,
         on_change: F,
-        base_color: Color
+        base_color: Color,
     ) -> Self
     where
-        F: 'static + Fn(Vec<T>) -> Message
+        F: 'static + Fn(Vec<T>) -> Message,
     {
-        let slider_values: Vec<T> = values.into_iter()
+        let slider_values: Vec<T> = values
+            .into_iter()
             .map(|value| {
                 if value >= *range.start() && value <= *range.end() {
                     value
@@ -63,7 +63,7 @@ where
             spacing: 0,
             padding: Padding::ZERO,
             base_color,
-            style: Renderer::Style::default()
+            style: Renderer::Style::default(),
         }
     }
 
@@ -120,13 +120,13 @@ where
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct State {
-    last_cursor_position: Option<Point>
+    last_cursor_position: Option<Point>,
 }
 
 impl Default for State {
     fn default() -> Self {
         State {
-            last_cursor_position: None
+            last_cursor_position: None,
         }
     }
 }
@@ -137,9 +137,7 @@ impl State {
     }
 }
 
-
-impl<'a, T, Message, Renderer> Widget<Message, Renderer>
-    for MultiSlider<'a, T, Message, Renderer>
+impl<'a, T, Message, Renderer> Widget<Message, Renderer> for MultiSlider<'a, T, Message, Renderer>
 where
     T: Copy + Into<f64> + num_traits::FromPrimitive + std::fmt::Debug,
     Message: Clone,
@@ -153,11 +151,7 @@ where
         Length::Shrink
     }
 
-    fn layout(
-        &self,
-        _renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    fn layout(&self, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let limits = limits
             .width(Length::from(self.width))
             .height(Length::from(self.height))
@@ -215,13 +209,14 @@ where
             }
         };
 
-        let map_slider_fct = |min_index: usize, max_index: usize, position_y_a: f32, position_y_b: f32| {
-            move |index: usize| -> (f32, usize) {
-                let factor = (index - min_index) as f32 / (max_index - min_index) as f32;
-                let interpolated_y = position_y_a + factor * (position_y_b - position_y_a);
-                (interpolated_y, index)
-            }
-        };
+        let map_slider_fct =
+            |min_index: usize, max_index: usize, position_y_a: f32, position_y_b: f32| {
+                move |index: usize| -> (f32, usize) {
+                    let factor = (index - min_index) as f32 / (max_index - min_index) as f32;
+                    let interpolated_y = position_y_a + factor * (position_y_b - position_y_a);
+                    (interpolated_y, index)
+                }
+            };
 
         let mut change = || -> () {
             let current_slider_index = get_slider_index(cursor_position);
@@ -229,38 +224,47 @@ where
             match self.state.last_cursor_position {
                 Some(last_cursor_position) => {
                     let previous_slider_index = get_slider_index(last_cursor_position);
-                    let mut sliders_to_edit = ((previous_slider_index + 1)..(current_slider_index + 1)).into_iter()
-                        .map(map_slider_fct(previous_slider_index, current_slider_index, last_cursor_position.y, cursor_position.y))
+                    let mut sliders_to_edit = ((previous_slider_index + 1)
+                        ..(current_slider_index + 1))
+                        .into_iter()
+                        .map(map_slider_fct(
+                            previous_slider_index,
+                            current_slider_index,
+                            last_cursor_position.y,
+                            cursor_position.y,
+                        ))
                         .collect();
-                    
+
                     if (current_slider_index as isize - previous_slider_index as isize).abs() <= 1 {
                         sliders_to_edit = vec![(cursor_position.y, current_slider_index)];
                     } else if previous_slider_index > current_slider_index {
-                        sliders_to_edit = (current_slider_index..previous_slider_index).into_iter()
-                            .map(map_slider_fct(current_slider_index, previous_slider_index, cursor_position.y, last_cursor_position.y))
+                        sliders_to_edit = (current_slider_index..previous_slider_index)
+                            .into_iter()
+                            .map(map_slider_fct(
+                                current_slider_index,
+                                previous_slider_index,
+                                cursor_position.y,
+                                last_cursor_position.y,
+                            ))
                             .collect();
                     }
 
-                    let new_values: Vec<(Option<T>, usize)> = sliders_to_edit
-                        .into_iter()
-                        .map(interpolate_value)
-                        .collect();
+                    let new_values: Vec<(Option<T>, usize)> =
+                        sliders_to_edit.into_iter().map(interpolate_value).collect();
 
                     let mut values: Vec<T> = self.values.clone();
 
                     if new_values.iter().any(|(val, _)| val.is_some()) {
                         for (val, slider) in new_values {
                             match val {
-                                Some(value) => {
-                                    values[slider] = value
-                                },
-                                None => {},
+                                Some(value) => values[slider] = value,
+                                None => {}
                             }
                         }
 
                         messages.push((self.on_change)(values));
                     }
-                },
+                }
                 None => {
                     let new_value = interpolate_value((cursor_position.y, current_slider_index));
                     match new_value.0 {
@@ -268,10 +272,10 @@ where
                             let mut values: Vec<T> = self.values.clone();
                             values[current_slider_index] = value;
                             messages.push((self.on_change)(values));
-                        },
-                        None => {},
+                        }
+                        None => {}
                     }
-                },
+                }
             }
         };
 
@@ -320,10 +324,10 @@ where
         let content_bounds = layout.children().next().unwrap().bounds();
         let start = *self.range.start();
         let end = *self.range.end();
-        let values: Vec<f32> = self.values.iter()
-            .map(|&value| {
-                value.into() as f32
-            })
+        let values: Vec<f32> = self
+            .values
+            .iter()
+            .map(|&value| value.into() as f32)
             .collect();
 
         renderer.draw(
@@ -362,10 +366,9 @@ pub trait Renderer: iced_native::Renderer {
         active: Option<usize>,
         spacing: u16,
         base_color: Color,
-        style: &Self::Style
+        style: &Self::Style,
     ) -> Self::Output;
 }
-
 
 impl<'a, T, Message, Renderer> From<MultiSlider<'a, T, Message, Renderer>>
     for Element<'a, Message, Renderer>
@@ -374,9 +377,7 @@ where
     Message: 'a + Clone,
     Renderer: 'a + self::Renderer,
 {
-    fn from(
-        multi_slider: MultiSlider<'a, T, Message, Renderer>,
-    ) -> Element<'a, Message, Renderer> {
+    fn from(multi_slider: MultiSlider<'a, T, Message, Renderer>) -> Element<'a, Message, Renderer> {
         Element::new(multi_slider)
     }
 }

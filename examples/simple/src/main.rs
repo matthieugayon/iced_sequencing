@@ -1,14 +1,21 @@
 // Import iced modules.
 use iced::{
-    Align, Button, Color, Column, Container,
+    Button, Color, Column, Container,
     Element, Length, Sandbox, Settings, Text, button, 
-    container
+    container, Alignment
 };
 
 use iced_native::Padding;
 
 // Import iced_audio sequencing.
 use iced_sequencing::{grid, snapshot, h_list, multi_slider};
+use iced_sequencing::core::grid::{
+    GridEvent,
+    GridPattern,
+    GridMessage, 
+    GridMessageKind,
+    Target
+};
 use iced_sequencing::style::color_utils::hex;
 use ganic_no_std::pattern::Pattern;
 
@@ -31,8 +38,7 @@ impl container::StyleSheet for MainContainerStyle {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    SetPattern(Pattern),
-    FocusTrack(usize),
+    GridEvent(GridMessage),
     Dragged(h_list::DragEvent),
     Clicked(usize),
     SetVelocities(Vec<f32>),
@@ -41,12 +47,16 @@ pub enum Message {
 }
 
 pub fn main() {
-    App::run(Settings::default()).unwrap();
+    App::run(Settings {
+        antialiasing: true,
+        ..Settings::default()
+    }).unwrap();
 }
 
 pub struct App {
     add_snapshot_button: button::State,
     grid_state: grid::State,
+    live_pattern: GridPattern,
     multi_slider: multi_slider::State,
     snapshot_list: h_list::State<Item>,
     current_snapshot: usize,
@@ -58,10 +68,12 @@ impl Sandbox for App {
 
     fn new() -> App {
         let test = Item::new(None);
+        let initial_pattern = GridPattern::from(test.data.unwrap());
 
         App {
             add_snapshot_button: button::State::new(),
-            grid_state: grid::State::new(test.data),
+            grid_state: grid::State::new(initial_pattern.clone()),
+            live_pattern: initial_pattern,
             multi_slider: multi_slider::State::new(),
             snapshot_list: h_list::State::new(vec![test]),
             current_snapshot: 0,
@@ -74,11 +86,82 @@ impl Sandbox for App {
     }
 
     fn update(&mut self, event: Message) {
+        println!("--- update {:?}", event);
+
         match event {
-            Message::SetPattern(pattern) => {
-                // update snapshot list 
-                self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
-            }
+            // Message::SetPatternState(pattern) => {
+            //     // update widget state
+            //     self.live_pattern = pattern;
+            //     self.grid_state.set_pattern(pattern);
+            //     self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
+            // },
+            // Message::SetPatternUI(pattern) => {
+            //     // update widget temporary state
+            //     self.live_pattern = pattern;
+            //     self.grid_state.temporary_pattern(pattern);
+            //     self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
+            // },
+            Message::GridEvent(grid_message) => {
+                let GridMessage { message, target } = grid_message;
+                let mut next_grid = self.grid_state.clone_base_pattern();
+
+                match message {
+                    GridMessageKind::Add((step, track, offset)) => {
+                        next_grid.data.insert((step, track), GridEvent {
+                            offset,
+                            ..GridEvent::default()
+                        });
+                    },
+                    GridMessageKind::Delete(grid_id) => {
+                        next_grid.data.remove(&grid_id);
+                    },
+                    GridMessageKind::ToggleOne(grid_id) => {
+                        next_grid.toggle_select(grid_id);
+                    },
+                    GridMessageKind::SelectOne(grid_id) => {
+                        next_grid.select_one(grid_id);
+                    },
+                    GridMessageKind::SelectArea(selection, bounds) => {
+                        next_grid.select_area(selection, bounds);
+                    },
+                    GridMessageKind::SelectAll() => {
+                        next_grid.select_all();
+                    },
+                    GridMessageKind::ToggleArea(selection, bounds) => {
+                        next_grid.toggle_area(selection, bounds);
+                    },
+                    GridMessageKind::MoveSelection((step_offset, track_offset)) => {
+                        next_grid.move_selection(step_offset, track_offset);
+                    },
+                    GridMessageKind::DeleteSelection() => {
+                        next_grid.remove_selection();
+                    },
+                    GridMessageKind::SetVelocity(ratio) => {
+                        next_grid.set_velocity(ratio);
+                    },
+                    GridMessageKind::TrackSelected(track) => {
+                        self.focused_track = track;
+                    },
+                    GridMessageKind::DiscardState() => {
+                        self.live_pattern = self.grid_state.clone_base_pattern();
+                    },
+                    GridMessageKind::CommitState() => {},
+                }
+
+                self.live_pattern = next_grid;
+
+                match target {
+                    Target::UI => {},
+                    Target::STATE => {
+                        self.grid_state.set_pattern(self.live_pattern.clone());
+                    },
+                }
+
+                self.snapshot_list.replace(
+                    self.current_snapshot, 
+                    Item::new(Some(Pattern::from(self.live_pattern.clone())))
+                );
+            },
             Message::SetVelocities(values) => {
                 let mut current_snapshot = self.snapshot_list.get_mut(self.current_snapshot).unwrap().data.unwrap();                
                 values.into_iter()
@@ -91,7 +174,7 @@ impl Sandbox for App {
                 self.snapshot_list.replace(self.current_snapshot, Item::new(Some(current_snapshot)));
 
                 // update grid state
-                self.grid_state.new_pattern(current_snapshot);
+                self.grid_state.set_pattern(GridPattern::from(current_snapshot));
             },
             Message::Dragged(h_list::DragEvent::Dropped {
                 pane,
@@ -106,10 +189,7 @@ impl Sandbox for App {
 
                 // update grid state
                 let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
-                self.grid_state.new_pattern(current_snapshot);
-            }
-            Message::FocusTrack(track) => {
-                self.focused_track = track;
+                self.grid_state.set_pattern(GridPattern::from(current_snapshot));
             },
             Message::AddSnapshotPressed => {
                 self.snapshot_list.push(Item::new(Some(Pattern::new_test())))
@@ -130,7 +210,7 @@ impl Sandbox for App {
 
                     // update grid state
                     let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
-                    self.grid_state.new_pattern(current_snapshot);
+                    self.grid_state.set_pattern(GridPattern::from(current_snapshot));
                 }
                 
                 self.snapshot_list.remove(delete_index);
@@ -174,8 +254,8 @@ impl Sandbox for App {
 
         let grid = grid::Grid::new(
             &mut self.grid_state, 
-            Message::SetPattern,
-            Message::FocusTrack,
+            self.live_pattern.clone(),
+            Message::GridEvent,
             Length::from(Length::Units(690)),
             Length::from(Length::Units(345))
         );
@@ -193,7 +273,7 @@ impl Sandbox for App {
             .step(0.01);
 
         let content: Element<_> = Column::new()
-            .align_items(Align::Center)
+            .align_items(Alignment::Center)
             .push(
                 Button::new(&mut self.add_snapshot_button, Text::new("Add new snapshot"))
                     .on_press(Message::AddSnapshotPressed),

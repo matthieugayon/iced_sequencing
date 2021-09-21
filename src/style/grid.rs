@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use iced_native::Color;
+use std::collections::HashMap;
 
-use super::color_utils::{lighten, hex};
+use super::color_utils::{hex, lighten};
 
 const STEP_BORDER_LEFT_COLOR: Color = Color::from_rgb(
     0x25 as f32 / 255.0,
@@ -28,7 +28,6 @@ const EVENT_SELECTED_BORDER_COLOR: Color = Color::from_rgb(0.87, 0.87, 0.87);
 const EVENT_SELECTED_MARKER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
 const SELECTION_BORDER_COLOR: Color = Color::from_rgb(0.8, 0.8, 0.8);
 
-
 #[derive(Debug, Clone)]
 pub struct Style {
     pub step_bg_color: Color,
@@ -47,7 +46,7 @@ pub struct Style {
     pub event_selected_color: Color,
     pub event_selected_border_color: Color,
     pub event_selected_marker_color: Color,
-    pub selection_border_color: Color
+    pub selection_border_color: Color,
 }
 pub trait StyleSheet {
     fn default(&self) -> Style;
@@ -126,7 +125,7 @@ impl StyleSheet for Default {
             event_selected_color: EVENT_SELECTED_COLOR,
             event_selected_border_color: EVENT_SELECTED_BORDER_COLOR,
             event_selected_marker_color: EVENT_SELECTED_MARKER_COLOR,
-            selection_border_color: SELECTION_BORDER_COLOR
+            selection_border_color: SELECTION_BORDER_COLOR,
         }
     }
 
@@ -148,7 +147,7 @@ impl StyleSheet for Default {
             event_selected_color: EVENT_SELECTED_COLOR,
             event_selected_border_color: EVENT_SELECTED_BORDER_COLOR,
             event_selected_marker_color: EVENT_SELECTED_MARKER_COLOR,
-            selection_border_color: SELECTION_BORDER_COLOR
+            selection_border_color: SELECTION_BORDER_COLOR,
         }
     }
 }
