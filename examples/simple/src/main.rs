@@ -136,6 +136,9 @@ impl Sandbox for App {
                     GridMessageKind::DeleteSelection() => {
                         next_grid.remove_selection();
                     },
+                    GridMessageKind::EmptySelection() => {
+                        next_grid.empty_selection();
+                    },
                     GridMessageKind::SetVelocity(ratio) => {
                         next_grid.set_velocity(ratio);
                     },
@@ -145,16 +148,21 @@ impl Sandbox for App {
                     GridMessageKind::DiscardState() => {
                         self.live_pattern = self.grid_state.clone_base_pattern();
                     },
-                    GridMessageKind::CommitState() => {},
+                    GridMessageKind::CommitState() => {
+                        self.grid_state.set_pattern(self.live_pattern.clone());
+                    }
                 }
 
-                self.live_pattern = next_grid;
-
                 match target {
-                    Target::UI => {},
-                    Target::STATE => {
-                        self.grid_state.set_pattern(self.live_pattern.clone());
+                    Target::UI => {
+                        self.live_pattern = next_grid;
                     },
+                    Target::STATE => {
+                        // self.grid_state.set_pattern
+                        self.grid_state.set_pattern(next_grid.clone());
+                        self.live_pattern = next_grid;
+                    },
+                    _ => ()
                 }
 
                 self.snapshot_list.replace(

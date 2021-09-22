@@ -295,7 +295,7 @@ impl WidgetState for Selecting {
             Transition::ChangeState(Box::new(Waiting::default())),
             Some(vec![GridMessage {
                 message: GridMessageKind::CommitState(),
-                target: Target::STATE,
+                target: Target::NONE,
             }]),
         )
     }

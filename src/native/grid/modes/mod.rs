@@ -7,12 +7,27 @@ pub use logo::Logo;
 pub use shift::Shift;
 
 use super::WidgetContext;
-use crate::core::grid::{GridMessage, GridPattern};
+use crate::core::grid::{
+    GridMessage, 
+    GridPattern,
+    GridMessageKind,
+    Target
+};
 use iced_native::{keyboard, Point, Rectangle};
 use std::fmt::Debug;
 
 pub trait WidgetState: Debug {
     fn on_cancelled(&mut self, _context: &mut WidgetContext) {}
+    
+    fn on_blur(
+        &mut self, 
+        _context: &mut WidgetContext
+    ) -> (Transition, Option<Vec<GridMessage>>) {
+        let messages = Some(vec![
+            GridMessage { message: GridMessageKind::EmptySelection(), target: Target::NONE }
+        ]);
+        (Transition::DoNothing, messages)
+    }
 
     fn on_click(
         &mut self,

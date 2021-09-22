@@ -156,7 +156,6 @@ impl GridPattern {
     }
 
     pub fn select_all(&mut self) {
-        // add event
         self.data.iter_mut().for_each(|(_, grid)| {
             grid.selected = true;
         });
@@ -210,6 +209,12 @@ impl GridPattern {
                 self.data.remove(&(step, track));
             }
         }
+    }
+
+    pub fn empty_selection(&mut self) {
+        self.data.iter_mut().for_each(|(_, grid)| {
+            grid.selected = false;
+        });
     }
 
     pub fn move_selection_quantized(
@@ -616,6 +621,7 @@ impl From<GridPattern> for Pattern {
 pub enum Target {
     UI,
     STATE,
+    NONE
 }
 
 #[derive(Debug, Clone)]
@@ -626,6 +632,7 @@ pub enum GridMessageKind {
     SelectOne((usize, usize)),
     SelectArea(Rectangle, Size),
     SelectAll(),
+    EmptySelection(),
     ToggleArea(Rectangle, Size),
     MoveSelection((f32, isize)),
     DeleteSelection(),

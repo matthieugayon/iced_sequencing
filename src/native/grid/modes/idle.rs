@@ -366,7 +366,7 @@ impl WidgetState for Selecting {
             Transition::ChangeState(Box::new(Waiting::default())),
             Some(vec![GridMessage {
                 message: GridMessageKind::CommitState(),
-                target: Target::STATE,
+                target: Target::NONE,
             }]),
         )
     }
@@ -418,7 +418,7 @@ impl WidgetState for MovingSelectionQuantized {
         let movement =
             base_pattern.move_selection_quantized(bounds, drag_bounds, cursor, self.origin_event);
 
-        if movement.0 != 0. && movement.1 != 0 {
+        if movement.0 != 0. || movement.1 != 0 {
             return (
                 Transition::DoNothing,
                 Some(vec![GridMessage {
@@ -463,7 +463,7 @@ impl WidgetState for MovingSelectionQuantized {
             Transition::ChangeState(Box::new(Waiting::default())),
             Some(vec![GridMessage {
                 message: GridMessageKind::CommitState(),
-                target: Target::STATE,
+                target: Target::NONE,
             }]),
         )
     }
@@ -553,7 +553,7 @@ impl WidgetState for MovingSelectionUnquantized {
             Transition::ChangeState(Box::new(Waiting::default())),
             Some(vec![GridMessage {
                 message: GridMessageKind::CommitState(),
-                target: Target::STATE,
+                target: Target::NONE,
             }]),
         )
     }
