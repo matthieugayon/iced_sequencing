@@ -2,8 +2,8 @@ use super::Logo;
 use super::Shift;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
-    get_hovered_step, get_hovered_track, get_step_width, GridEvent, GridMessage, GridMessageKind,
-    GridPattern, Target,
+    get_hovered_step, get_hovered_track, get_step_width, 
+    GridEvent, GridMessage, GridPattern
 };
 use iced_native::{keyboard, mouse, Point, Rectangle};
 
@@ -157,16 +157,17 @@ impl WidgetState for Waiting {
         base_pattern: GridPattern,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
+        let mut grid_messages = vec![
+            GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
+            GridMessage::EmptySelection()
+        ];
+
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
             // if yes remove event
-            Some((grid_id, _grid_event)) => (
-                Transition::DoNothing,
-                Some(vec![GridMessage {
-                    message: GridMessageKind::Delete(*grid_id),
-                    target: Target::STATE,
-                }]),
-            ),
+            Some((grid_id, _grid_event)) => {
+                grid_messages.push(GridMessage::Delete(*grid_id));
+            },
             // otherwise add event
             None => {
                 let step_width = get_step_width(bounds.size());
@@ -179,19 +180,15 @@ impl WidgetState for Waiting {
 
                 if interactive_area.contains(cursor) {
                     let (step, track, _) = get_hovered_step(cursor, bounds, true);
-
-                    (
-                        Transition::DoNothing,
-                        Some(vec![GridMessage {
-                            message: GridMessageKind::Add((step, track, 0.)),
-                            target: Target::STATE,
-                        }]),
-                    )
-                } else {
-                    (Transition::DoNothing, None)
+                    grid_messages.push(GridMessage::Add((step, track, 0.)));
                 }
             }
         }
+
+        (
+            Transition::DoNothing,
+            Some(grid_messages),
+        )
     }
 
     fn on_click(
@@ -201,20 +198,18 @@ impl WidgetState for Waiting {
         base_pattern: GridPattern,
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
+        let mut grid_messages = vec![
+            GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
+        ];
+
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
             // if yes remove event
             Some(((step, track), grid_event)) => {
-                let mut grid_messages = vec![GridMessage {
-                    message: GridMessageKind::TrackSelected(*track),
-                    target: Target::STATE,
-                }];
-
                 if !grid_event.selected {
-                    grid_messages.push(GridMessage {
-                        message: GridMessageKind::SelectOne((*step, *track)),
-                        target: Target::STATE,
-                    })
+                    println!("event not selected");
+                    grid_messages.push(GridMessage::EmptySelection());
+                    grid_messages.push(GridMessage::SelectOne((*step, *track)))
                 }
 
                 context.mouse_interaction = mouse::Interaction::Grab;
@@ -229,22 +224,11 @@ impl WidgetState for Waiting {
             }
             // otherwise add event
             None => {
-                let grid_message = {
-                    if bounds.contains(cursor) {
-                        Some(vec![GridMessage {
-                            message: GridMessageKind::TrackSelected(get_hovered_track(
-                                cursor, bounds,
-                            )),
-                            target: Target::STATE,
-                        }])
-                    } else {
-                        None
-                    }
-                };
+                grid_messages.push(GridMessage::EmptySelection());
 
                 (
                     Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
-                    grid_message,
+                    Some(grid_messages),
                 )
             }
         }
@@ -275,26 +259,17 @@ impl WidgetState for Waiting {
         key_code: keyboard::KeyCode,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        let message_kind = match key_code {
-            keyboard::KeyCode::A => Some(GridMessageKind::SelectAll()),
-            keyboard::KeyCode::Backspace => Some(GridMessageKind::DeleteSelection()),
-            keyboard::KeyCode::Left => Some(GridMessageKind::MoveSelection((-1., 0))),
-            keyboard::KeyCode::Up => Some(GridMessageKind::MoveSelection((0., -1))),
-            keyboard::KeyCode::Right => Some(GridMessageKind::MoveSelection((1., 0))),
-            keyboard::KeyCode::Down => Some(GridMessageKind::MoveSelection((0., 1))),
+        let grid_message = match key_code {
+            keyboard::KeyCode::A => Some(vec![GridMessage::EmptySelection(), GridMessage::SelectAll()]),
+            keyboard::KeyCode::Backspace => Some(vec![GridMessage::DeleteSelection()]),
+            keyboard::KeyCode::Left => Some(vec![GridMessage::MoveSelection((-1., 0), true)]),
+            keyboard::KeyCode::Up => Some(vec![GridMessage::MoveSelection((0., -1), true)]),
+            keyboard::KeyCode::Right => Some(vec![GridMessage::MoveSelection((1., 0), true)]),
+            keyboard::KeyCode::Down => Some(vec![GridMessage::MoveSelection((0., 1), true)]),
             _ => None,
         };
 
-        match message_kind {
-            Some(grid_message_kind) => (
-                Transition::DoNothing,
-                Some(vec![GridMessage {
-                    message: grid_message_kind,
-                    target: Target::STATE,
-                }]),
-            ),
-            None => (Transition::DoNothing, None),
-        }
+        (Transition::DoNothing, grid_message)
     }
 }
 
@@ -319,14 +294,14 @@ impl WidgetState for Selecting {
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let selection = Rectangle {
             x: if cursor.x - self.origin.x < 0.0 {
-                cursor.x
+                cursor.x - bounds.x
             } else {
-                self.origin.x
+                self.origin.x - bounds.x
             },
             y: if cursor.y - self.origin.y < 0.0 {
-                cursor.y
+                cursor.y - bounds.y
             } else {
-                self.origin.y
+                self.origin.y - bounds.y
             },
             width: if cursor.x - self.origin.x < 0.0 {
                 self.origin.x - cursor.x
@@ -345,10 +320,7 @@ impl WidgetState for Selecting {
 
         (
             Transition::DoNothing,
-            Some(vec![GridMessage {
-                message: GridMessageKind::SelectArea(selection, bounds.size()),
-                target: Target::UI,
-            }]),
+            Some(vec![GridMessage::SelectArea(selection, bounds.size())]),
         )
     }
 
@@ -362,13 +334,7 @@ impl WidgetState for Selecting {
         // erase selection Rectangle
         context.selection_rectangle = None;
 
-        (
-            Transition::ChangeState(Box::new(Waiting::default())),
-            Some(vec![GridMessage {
-                message: GridMessageKind::CommitState(),
-                target: Target::NONE,
-            }]),
-        )
+        (Transition::ChangeState(Box::new(Waiting::default())), None)
     }
 
     fn on_modifier_change(
@@ -421,10 +387,7 @@ impl WidgetState for MovingSelectionQuantized {
         if movement.0 != 0. || movement.1 != 0 {
             return (
                 Transition::DoNothing,
-                Some(vec![GridMessage {
-                    message: GridMessageKind::MoveSelection(movement),
-                    target: Target::UI,
-                }]),
+                Some(vec![GridMessage::MoveSelection(movement, false)]),
             );
         }
 
@@ -459,13 +422,7 @@ impl WidgetState for MovingSelectionQuantized {
         // erase selection Rectangle
         context.selection_rectangle = None;
 
-        (
-            Transition::ChangeState(Box::new(Waiting::default())),
-            Some(vec![GridMessage {
-                message: GridMessageKind::CommitState(),
-                target: Target::NONE,
-            }]),
-        )
+        (Transition::ChangeState(Box::new(Waiting::default())), None)
     }
 }
 
@@ -511,10 +468,7 @@ impl WidgetState for MovingSelectionUnquantized {
 
             return (
                 Transition::DoNothing,
-                Some(vec![GridMessage {
-                    message: GridMessageKind::MoveSelection(movement),
-                    target: Target::UI,
-                }]),
+                Some(vec![GridMessage::MoveSelection(movement, false)]),
             );
         }
 
@@ -549,12 +503,6 @@ impl WidgetState for MovingSelectionUnquantized {
         // erase selection Rectangle
         context.selection_rectangle = None;
 
-        (
-            Transition::ChangeState(Box::new(Waiting::default())),
-            Some(vec![GridMessage {
-                message: GridMessageKind::CommitState(),
-                target: Target::NONE,
-            }]),
-        )
+        (Transition::ChangeState(Box::new(Waiting::default())), None)
     }
 }

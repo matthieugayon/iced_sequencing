@@ -88,14 +88,17 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         match grid_messages {
             Some(messages) => {
                 messages.into_iter().for_each(|message| {
-                    messages_queue.push((self.on_event)(message.clone()));
+                    // clear event cache to update events display
+                    self.state.event_cache.clear();
+
+                    messages_queue.push((self.on_event)(message));
                    
-                    match message.target.clone() {
-                        Target::UI => {
-                            self.state.event_cache.clear();
-                        },
-                        _ => {},
-                    }
+                    // match message.target.clone() {
+                    //     Target::UI => {
+                    //         self.state.event_cache.clear();
+                    //     },
+                    //     _ => {},
+                    // }
 
                     // match message {
                     //     GridMessage::NewPattern(grid, target) => {
@@ -147,6 +150,7 @@ pub struct State {
     current_state: Box<dyn WidgetState + Send>, // state machine state
     context: WidgetContext,                     // context we'll mutate in our state machine
     base_pattern: GridPattern,
+    temp_movement: Option<(f32, isize)>,
     last_click: Option<mouse::Click>,
     highlight: [usize; NUM_PERCS],
     is_playing: bool,
@@ -164,6 +168,7 @@ impl State {
                 mouse_interaction: mouse::Interaction::default(),
             },
             base_pattern: grid,
+            temp_movement: None,
             last_click: None,
             highlight: [0; NUM_PERCS],
             is_playing: false,
@@ -175,13 +180,31 @@ impl State {
 
     pub fn set_pattern(&mut self, grid: GridPattern) {
         self.base_pattern = grid;
-        self.event_cache.clear();
+        self.temp_movement = None;
+        // self.event_cache.clear();
     }
 
-    // pub fn temporary_pattern(&mut self, grid: GridPattern) {
-    //     self.context.temporary_pattern = Some(grid);
-    //     self.event_cache.clear();
-    // }
+    pub fn set_movement(&mut self, movement: (f32, isize), relative: bool) {
+        match self.temp_movement {
+            Some(current_movement) => {
+                if relative {
+                    self.temp_movement = Some((
+                        current_movement.0 + movement.0,
+                        current_movement.1 + movement.1
+                    ));
+                } else {
+                    self.temp_movement = Some(movement);
+                }
+            },
+            None => {
+                self.temp_movement = Some(movement);
+            },
+        }
+    }
+
+    pub fn get_movement(&self) -> Option<(f32, isize)> {
+        return self.temp_movement;
+    }
 
     pub fn clone_base_pattern(&self) -> GridPattern {
         self.base_pattern.clone()

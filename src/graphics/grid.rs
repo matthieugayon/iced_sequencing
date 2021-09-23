@@ -79,8 +79,8 @@ fn draw_selection(selection: Rectangle, bounds: Rectangle, style: &Style) -> Pri
     let mut frame = Frame::new(bounds.size());
 
     let top_left = Point {
-        x: selection.x - bounds.x,
-        y:  selection.y - bounds.y
+        x: selection.x,
+        y:  selection.y
     };
 
     let area = Path::rectangle(top_left, selection.size());
@@ -135,7 +135,7 @@ fn draw_grid(
         frame.fill(&offset_bg, style.step_bg_color);
     }
 
-    for step in 0..NUM_STEPS {
+    for step in 0..NUM_STEPS + 1 {
         let step_offset_x = (step + 1) as f32 * step_size.width;
 
         let step_line = Path::line(
@@ -288,7 +288,7 @@ fn draw_steps(
         if grid_event.offset > 0. {
             let offset = Path::rectangle(
                 Point {
-                    x: 1. + event_bounds.x,
+                    x: step_position.x,
                     y: event_bounds.y + step_size.height,
                 },
                 Size {

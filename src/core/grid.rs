@@ -278,7 +278,7 @@ impl GridPattern {
         let size = bounds.size();
         let max_positive_offset: f32 =
             (NUM_STEPS - origin_event.0) as f32 - origin_event.2.offset - OFFSET_THRESHOLD;
-        let min_negative_offset: f32 = -1. * origin_event.0 as f32 - origin_event.2.offset;
+        let min_negative_offset: f32 = -1. * origin_event.0 as f32 - origin_event.2.offset - 0.99;
         let step_size = get_step_dimensions(size);
         let step_offset = (drag_bounds.width / step_size.width)
             .min(max_positive_offset)
@@ -287,13 +287,9 @@ impl GridPattern {
         let track_offset: isize = hovered_track as isize - origin_event.1 as isize;
 
         (step_offset, track_offset)
-        // self.move_selection(step_offset, track_offset);
     }
 
     pub fn move_selection(&mut self, step_offset: f32, track_offset: isize) {
-        // println!("self.data {:?}", self.data);
-        // println!("step_offset {:?} track_offset {:?}", step_offset, track_offset);
-
         // init empty hashmap
         let mut output: HashMap<(usize, usize), GridEvent> = HashMap::new();
 
@@ -337,8 +333,6 @@ impl GridPattern {
             }
         }
 
-        // println!("output {:?}", output);
-
         self.data = output;
     }
 
@@ -352,12 +346,25 @@ impl GridPattern {
     ) {
         match cases {
             // we are dragging to the right
+            // offset is <= 0.5
             // nothing on the step to be dragged on, nothing on the next one either
-            (drag_right, offset, None, None) if drag_right => {
+            (drag_right, offset, None, None) 
+                if drag_right && offset <= 0.5 => {
                 output.insert(
                     (step, track),
                     GridEvent {
                         offset,
+                        velocity: event.velocity,
+                        selected: true,
+                    },
+                );
+            }
+            (drag_right, offset, None, None) 
+                if drag_right && offset > 0.5 => {
+                output.insert(
+                    ((step + 1) % NUM_STEPS, track),
+                    GridEvent {
+                        offset: offset - 1.,
                         velocity: event.velocity,
                         selected: true,
                     },
@@ -424,7 +431,19 @@ impl GridPattern {
             }
             // we are dragging to the left
             // nothing on the step to be dragged on, nothing on the next one either
-            (drag_right, offset, None, None) if !drag_right => {
+            (drag_right, offset, None, None) 
+                if !drag_right && offset > 0.5  => {
+                output.insert(
+                    ((step + 1) % NUM_STEPS, track),
+                    GridEvent {
+                        offset: offset - 1.,
+                        velocity: event.velocity,
+                        selected: true,
+                    },
+                );
+            }
+            (drag_right, offset, None, None) 
+                if !drag_right && offset <= 0.5  => {
                 output.insert(
                     (step, track),
                     GridEvent {
@@ -531,40 +550,6 @@ impl GridPattern {
         }
     }
 
-    // clean negative offset which may stay on unselected events, when moving evenst around
-    // since basic iterating on Hashmap is not ordered, we need to sort the iterator
-    // because only when cycling through in an orderly manner (per track / event in ascending order)
-    // are we sure to treat every event correctly
-    pub fn clean_negative_offsets(&mut self) {
-        for ((step, track), event) in self.data.to_owned().into_iter().sorted_by(|x, y| {
-            if x.0 .1 == y.0 .1 {
-                return x.0 .0.cmp(&y.0 .0);
-            }
-            x.0 .1.cmp(&y.0 .1)
-        }) {
-            if event.offset < 0. {
-                // let previous_step = (step - 1 + NUM_STEPS) % NUM_STEPS;
-                let previous_step = step.checked_sub(1).unwrap_or(NUM_STEPS - 1);
-                let previous_event = self.data.get(&(previous_step, track));
-
-                match previous_event {
-                    None => {
-                        self.data.remove(&(step, track));
-                        self.data.insert(
-                            (previous_step, track),
-                            GridEvent {
-                                offset: event.offset + 1.,
-                                velocity: event.velocity,
-                                selected: false,
-                            },
-                        );
-                    }
-                    Some(_) => {}
-                }
-            }
-        }
-    }
-
     pub fn set_velocity(&mut self, ratio: f32) {
         self.data.iter_mut().for_each(|(_, event)| {
             if event.selected {
@@ -625,25 +610,19 @@ pub enum Target {
 }
 
 #[derive(Debug, Clone)]
-pub enum GridMessageKind {
-    Add((usize, usize, f32)),
-    Delete((usize, usize)),
-    ToggleOne((usize, usize)),
-    SelectOne((usize, usize)),
-    SelectArea(Rectangle, Size),
+pub enum GridMessage {
+    Add((usize, usize, f32)), // empty selection, add event, select event => COMMITS STATE
+    Delete((usize, usize)), // delete selection
+    ToggleOne((usize, usize)), // just mutate selection
+    SelectOne((usize, usize)), // empty selection, select new one
+    SelectArea(Rectangle, Size), // empty selection, select new one
     SelectAll(),
     EmptySelection(),
     ToggleArea(Rectangle, Size),
-    MoveSelection((f32, isize)),
+    MoveSelection((f32, isize), bool),
     DeleteSelection(),
     SetVelocity(f32),
     TrackSelected(usize),
     CommitState(),
     DiscardState(),
-}
-
-#[derive(Debug, Clone)]
-pub struct GridMessage {
-    pub message: GridMessageKind,
-    pub target: Target,
 }

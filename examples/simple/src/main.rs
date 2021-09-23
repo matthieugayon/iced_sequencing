@@ -12,12 +12,13 @@ use iced_sequencing::{grid, snapshot, h_list, multi_slider};
 use iced_sequencing::core::grid::{
     GridEvent,
     GridPattern,
-    GridMessage, 
-    GridMessageKind,
-    Target
+    GridMessage
 };
 use iced_sequencing::style::color_utils::hex;
-use ganic_no_std::pattern::Pattern;
+use ganic_no_std::{
+    pattern::Pattern,
+    NUM_PERCS
+};
 
 const WINDOW_BG_COLOR: Color = Color::from_rgb(
     0x25 as f32 / 255.0,
@@ -102,67 +103,80 @@ impl Sandbox for App {
             //     self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
             // },
             Message::GridEvent(grid_message) => {
-                let GridMessage { message, target } = grid_message;
                 let mut next_grid = self.grid_state.clone_base_pattern();
 
-                match message {
-                    GridMessageKind::Add((step, track, offset)) => {
+                match grid_message {
+                    GridMessage::EmptySelection() => {
+                        self.live_pattern.empty_selection();
+                        self.grid_state.set_pattern(self.live_pattern.clone());
+                    },
+                    GridMessage::Add((step, track, offset)) => {
                         next_grid.data.insert((step, track), GridEvent {
                             offset,
                             ..GridEvent::default()
                         });
+                        self.live_pattern = next_grid;
+                        self.grid_state.set_pattern(self.live_pattern.clone());
                     },
-                    GridMessageKind::Delete(grid_id) => {
+                    GridMessage::Delete(grid_id) => {
                         next_grid.data.remove(&grid_id);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::ToggleOne(grid_id) => {
+                    GridMessage::ToggleOne(grid_id) => {
                         next_grid.toggle_select(grid_id);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::SelectOne(grid_id) => {
+                    GridMessage::SelectOne(grid_id) => {
                         next_grid.select_one(grid_id);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::SelectArea(selection, bounds) => {
+                    GridMessage::SelectArea(selection, bounds) => {
                         next_grid.select_area(selection, bounds);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::SelectAll() => {
+                    GridMessage::SelectAll() => {
                         next_grid.select_all();
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::ToggleArea(selection, bounds) => {
+                    GridMessage::ToggleArea(selection, bounds) => {
                         next_grid.toggle_area(selection, bounds);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::MoveSelection((step_offset, track_offset)) => {
-                        next_grid.move_selection(step_offset, track_offset);
+                    GridMessage::MoveSelection(next_movement, relative) => {
+                        self.grid_state.set_movement(next_movement, relative);
+                        
+                        match self.grid_state.get_movement() {
+                            Some(movement) => {
+                                next_grid.move_selection(movement.0, movement.1);
+                            },
+                            None => {},
+                        }
+
+                        self.live_pattern = next_grid;
                     },
-                    GridMessageKind::DeleteSelection() => {
+                    GridMessage::DeleteSelection() => {
                         next_grid.remove_selection();
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::EmptySelection() => {
-                        next_grid.empty_selection();
-                    },
-                    GridMessageKind::SetVelocity(ratio) => {
+                    GridMessage::SetVelocity(ratio) => {
                         next_grid.set_velocity(ratio);
+                        self.live_pattern = next_grid.clone();
+                        self.grid_state.set_pattern(next_grid);
                     },
-                    GridMessageKind::TrackSelected(track) => {
-                        self.focused_track = track;
+                    GridMessage::TrackSelected(track) => {
+                        self.focused_track = NUM_PERCS - track - 1;
                     },
-                    GridMessageKind::DiscardState() => {
+                    GridMessage::DiscardState() => {
                         self.live_pattern = self.grid_state.clone_base_pattern();
                     },
-                    GridMessageKind::CommitState() => {
-                        self.grid_state.set_pattern(self.live_pattern.clone());
-                    }
-                }
-
-                match target {
-                    Target::UI => {
-                        self.live_pattern = next_grid;
-                    },
-                    Target::STATE => {
-                        // self.grid_state.set_pattern
-                        self.grid_state.set_pattern(next_grid.clone());
-                        self.live_pattern = next_grid;
-                    },
-                    _ => ()
+                    _ => {}
                 }
 
                 self.snapshot_list.replace(
