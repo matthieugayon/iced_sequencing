@@ -1,9 +1,7 @@
-use itertools::Itertools;
 use std::collections::HashMap;
-
 use iced_native::{Point, Rectangle, Size};
-
 use ganic_no_std::{pattern::Pattern, NUM_PERCS, NUM_STEPS};
+use crate::native::grid::State;
 
 pub const TRACK_MARGIN_BOTTOM: f32 = 3.0;
 pub const DEFAULT_VELOCITY: f32 = 1.0;
@@ -626,3 +624,88 @@ pub enum GridMessage {
     CommitState(),
     DiscardState(),
 }
+
+
+pub fn manage_state_update(
+    message: GridMessage, 
+    state: &mut State, 
+    live_pattern: &mut GridPattern,
+    focused_track: &mut usize
+) {
+    let mut next_grid = state.clone_base_pattern();
+
+    match message {
+        GridMessage::EmptySelection() => {
+            live_pattern.empty_selection();
+            state.set_pattern(live_pattern.clone());
+        },
+        GridMessage::Add((step, track, offset)) => {
+            next_grid.data.insert((step, track), GridEvent {
+                offset,
+                ..GridEvent::default()
+            });
+            live_pattern.data = next_grid.data;
+            state.set_pattern(live_pattern.clone());
+        },
+        GridMessage::Delete(grid_id) => {
+            next_grid.data.remove(&grid_id);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::ToggleOne(grid_id) => {
+            next_grid.toggle_select(grid_id);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::SelectOne(grid_id) => {
+            next_grid.select_one(grid_id);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::SelectArea(selection, bounds) => {
+            next_grid.select_area(selection, bounds);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::SelectAll() => {
+            next_grid.select_all();
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::ToggleArea(selection, bounds) => {
+            next_grid.toggle_area(selection, bounds);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::MoveSelection(next_movement, relative) => {
+            state.set_movement(next_movement, relative);
+            
+            match state.get_movement() {
+                Some(movement) => {
+                    next_grid.move_selection(movement.0, movement.1);
+                },
+                None => {},
+            }
+
+            live_pattern.data = next_grid.data;
+        },
+        GridMessage::DeleteSelection() => {
+            next_grid.remove_selection();
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::SetVelocity(ratio) => {
+            next_grid.set_velocity(ratio);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::TrackSelected(track) => {
+            *focused_track = NUM_PERCS - track - 1;
+        },
+        GridMessage::DiscardState() => {
+            live_pattern.data = state.clone_base_pattern().data;
+        },
+        _ => {}
+    }
+}
+

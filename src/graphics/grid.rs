@@ -2,8 +2,11 @@ use crate::{core::grid::GridEvent, native::grid};
 use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
 
-use crate::core::grid::{get_event_bounds, get_step_dimensions, GridPattern, TRACK_MARGIN_BOTTOM};
-use iced_native::{mouse, Background, Color, Point, Rectangle, Size, Vector};
+use crate::core::grid::{
+    get_event_bounds, get_step_dimensions, 
+    GridPattern, TRACK_MARGIN_BOTTOM
+};
+use iced_native::{mouse, Color, Point, Rectangle, Size, Vector};
 
 pub use crate::native::grid::State;
 pub use crate::style::color_utils::{darken, lighten};
@@ -18,7 +21,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
 
     fn draw(
         &mut self,
-        bounds: Rectangle,
+        _bounds: Rectangle,
         drawable_area: Rectangle,
         _cursor_position: Point,
         grid_pattern: &GridPattern,
@@ -29,7 +32,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         style_sheet: &Self::Style,
         grid_cache: &Cache,
         event_cache: &Cache,
-        highlight_cache: &Cache,
+        _highlight_cache: &Cache,
     ) -> Self::Output {
         let style = style_sheet.default();
         let step_size = get_step_dimensions(drawable_area.size());
@@ -102,8 +105,8 @@ fn draw_grid(
     frame: &mut Frame,
     size: Size,
     step_size: Size,
-    is_playing: bool,
-    highlight: [usize; NUM_PERCS],
+    _is_playing: bool,
+    _highlight: [usize; NUM_PERCS],
     style: &Style,
 ) {
     for track in 0..NUM_PERCS {

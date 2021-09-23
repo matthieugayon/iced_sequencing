@@ -10,15 +10,12 @@ use iced_native::Padding;
 // Import iced_audio sequencing.
 use iced_sequencing::{grid, snapshot, h_list, multi_slider};
 use iced_sequencing::core::grid::{
-    GridEvent,
     GridPattern,
-    GridMessage
+    GridMessage,
+    manage_state_update
 };
 use iced_sequencing::style::color_utils::hex;
-use ganic_no_std::{
-    pattern::Pattern,
-    NUM_PERCS
-};
+use ganic_no_std::pattern::Pattern;
 
 const WINDOW_BG_COLOR: Color = Color::from_rgb(
     0x25 as f32 / 255.0,
@@ -90,94 +87,8 @@ impl Sandbox for App {
         println!("--- update {:?}", event);
 
         match event {
-            // Message::SetPatternState(pattern) => {
-            //     // update widget state
-            //     self.live_pattern = pattern;
-            //     self.grid_state.set_pattern(pattern);
-            //     self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
-            // },
-            // Message::SetPatternUI(pattern) => {
-            //     // update widget temporary state
-            //     self.live_pattern = pattern;
-            //     self.grid_state.temporary_pattern(pattern);
-            //     self.snapshot_list.replace(self.current_snapshot, Item::new(Some(pattern)));
-            // },
             Message::GridEvent(grid_message) => {
-                let mut next_grid = self.grid_state.clone_base_pattern();
-
-                match grid_message {
-                    GridMessage::EmptySelection() => {
-                        self.live_pattern.empty_selection();
-                        self.grid_state.set_pattern(self.live_pattern.clone());
-                    },
-                    GridMessage::Add((step, track, offset)) => {
-                        next_grid.data.insert((step, track), GridEvent {
-                            offset,
-                            ..GridEvent::default()
-                        });
-                        self.live_pattern = next_grid;
-                        self.grid_state.set_pattern(self.live_pattern.clone());
-                    },
-                    GridMessage::Delete(grid_id) => {
-                        next_grid.data.remove(&grid_id);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::ToggleOne(grid_id) => {
-                        next_grid.toggle_select(grid_id);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::SelectOne(grid_id) => {
-                        next_grid.select_one(grid_id);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::SelectArea(selection, bounds) => {
-                        next_grid.select_area(selection, bounds);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::SelectAll() => {
-                        next_grid.select_all();
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::ToggleArea(selection, bounds) => {
-                        next_grid.toggle_area(selection, bounds);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::MoveSelection(next_movement, relative) => {
-                        self.grid_state.set_movement(next_movement, relative);
-                        
-                        match self.grid_state.get_movement() {
-                            Some(movement) => {
-                                next_grid.move_selection(movement.0, movement.1);
-                            },
-                            None => {},
-                        }
-
-                        self.live_pattern = next_grid;
-                    },
-                    GridMessage::DeleteSelection() => {
-                        next_grid.remove_selection();
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::SetVelocity(ratio) => {
-                        next_grid.set_velocity(ratio);
-                        self.live_pattern = next_grid.clone();
-                        self.grid_state.set_pattern(next_grid);
-                    },
-                    GridMessage::TrackSelected(track) => {
-                        self.focused_track = NUM_PERCS - track - 1;
-                    },
-                    GridMessage::DiscardState() => {
-                        self.live_pattern = self.grid_state.clone_base_pattern();
-                    },
-                    _ => {}
-                }
+                manage_state_update(grid_message, &mut self.grid_state, &mut self.live_pattern, &mut self.focused_track);
 
                 self.snapshot_list.replace(
                     self.current_snapshot, 
