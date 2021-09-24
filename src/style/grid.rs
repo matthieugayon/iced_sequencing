@@ -1,107 +1,99 @@
+use ganic_no_std::NUM_PERCS;
 use iced_native::Color;
-use std::collections::HashMap;
+use super::color_utils::{hex, lighten, darken};
 
-use super::color_utils::{hex, lighten};
+#[derive(Debug, Clone, Copy)]
+pub struct WidgetBackground {
+    pub bg_color: Color,
+    pub border_width: f32,
+    pub border_radius: f32,
+    pub border_color: Color
+}
 
-const STEP_BORDER_LEFT_COLOR: Color = Color::from_rgb(
-    0x25 as f32 / 255.0,
-    0x22 as f32 / 255.0,
-    0x2A as f32 / 255.0, //180b28
-);
+#[derive(Debug, Clone, Copy)]
+pub enum GridColor {
+    Simple(Color),
+    Multitrack([Color; NUM_PERCS])
+}
 
-// const STEP_BG_COLOR: Color = Color::from_rgba(0.5, 0.5, 0.5, 0.20);
-// const STEP_BG_COLOR_2: Color = Color::from_rgba(0.5, 0.5, 0.5, 0.40);
 
-const STEP_BORDER_LEFT_COLOR_2: Color = Color::from_rgb(0.46, 0.46, 0.46);
-const STEP_LINE_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const STEP_LINE_COLOR_2: Color = Color::from_rgb(0.315, 0.315, 0.315);
-// const EVENT_HIGHLIGHT_BG_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const EVENT_BORDER_COLOR: Color = Color::WHITE;
-const EVENT_HIGHLIGHT_BORDER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const EVENT_MARKER_COLOR: (Color, Color) = (
-    Color::from_rgb(0., 0.7, 0.04), // green
-    Color::from_rgb(0.7, 0., 0.04), // yellow
-);
-const EVENT_HIGHLIGHT_MARKER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const EVENT_SELECTED_COLOR: Color = Color::from_rgb(0.894, 0.953, 0.059);
-const EVENT_SELECTED_BORDER_COLOR: Color = Color::from_rgb(0.87, 0.87, 0.87);
-const EVENT_SELECTED_MARKER_COLOR: Color = Color::from_rgb(0.315, 0.315, 0.315);
-const SELECTION_BORDER_COLOR: Color = Color::from_rgb(0.8, 0.8, 0.8);
+#[derive(Debug, Clone, Copy)]
+pub struct Stroke {
+    pub color: Color,
+    pub line_width: f32
+}
 
 #[derive(Debug, Clone)]
 pub struct Style {
-    pub step_bg_color: Color,
-    pub step_bg_color_2: Color,
-    pub step_highlight_bg_color: Color,
-    pub step_border_left_color: Color,
-    pub step_border_left_color_2: Color,
-    pub step_line_color: Color,
-    pub step_line_color_2: Color,
-    pub event_bg_color: HashMap<usize, Color>,
-    pub event_highlight_bg_color: HashMap<usize, Color>,
-    pub event_border_color: Color,
-    pub event_highlight_border_color: Color,
-    pub event_marker_color: (Color, Color),
-    pub event_highlight_marker_color: Color,
-    pub event_selected_color: Color,
-    pub event_selected_border_color: Color,
-    pub event_selected_marker_color: Color,
-    pub selection_border_color: Color,
+    pub event: Event,
+    pub grid: Grid,
+    pub background: Option<WidgetBackground>,
+
+    pub selection_stroke: Stroke,
+    pub selected_track_bg_color: Color,
+    pub current_step_bg_color: Color
 }
+
+#[derive(Debug, Clone)]
+pub struct Grid {
+    // BACKGROUNDS
+    pub even_beat_bg_color: Color,
+    pub odd_beat_bg_color: Color,
+    pub edge_step_bg_color: Color,
+
+    // LINES
+    pub even_beat_line: Stroke,
+    pub odd_beat_line: Stroke,
+    pub edge_step_line: Stroke,
+    pub track_margin_color: Color
+}
+
+impl std::default::Default for Grid {
+    fn default() -> Self {
+        Grid {
+            even_beat_bg_color: hex("374140"),
+            odd_beat_bg_color: hex("374140"),
+            edge_step_bg_color: hex("BDC3C7"),
+
+            even_beat_line: Stroke { color: hex("2A2C2B"), line_width: 1. },
+            odd_beat_line: Stroke { color: hex("2A2C2B"), line_width: 1. },
+            edge_step_line: Stroke { color: lighten(hex("2A2C2B"), 0.1), line_width: 1. },
+            track_margin_color: hex("2A2C2B")
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Event {
+    // BACKGROUNDS
+    pub contour_bg_color: Color,
+    pub bg_color: GridColor,
+    pub stroke: Stroke,
+    pub slider_bg_color: GridColor,
+    pub slider_highlighted_bg_color: GridColor,
+    pub negative_offset_marker_bg_color: Color,
+    pub positive_offset_marker_bg_color: Color,
+}
+
+
+impl std::default::Default for Event {
+    fn default() -> Self {
+        Event {
+            contour_bg_color: hex("BDC3C7"),
+            bg_color: GridColor::Simple(hex("D9CB9E")),
+            stroke: Stroke { color: hex("24272a"), line_width: 1. },
+            slider_bg_color: GridColor::Simple(hex("ff7d00")),
+            slider_highlighted_bg_color: GridColor::Simple(darken(hex("ff7d00"), 0.1)),
+            negative_offset_marker_bg_color: hex("7d00ff"),
+            positive_offset_marker_bg_color: hex("00ff7d")
+        }
+    }
+}
+
+
 pub trait StyleSheet {
     fn default(&self) -> Style;
     fn dragging_selection(&self) -> Style;
-}
-
-fn get_event_bg_color() -> HashMap<usize, Color> {
-    let mut event_bg_color: HashMap<usize, Color> = HashMap::new();
-    let purple = hex("6527b5");
-    event_bg_color.insert(9, purple);
-
-    let blue1 = hex("005ce1");
-    event_bg_color.insert(8, blue1);
-
-    let blue2 = hex("0098e7");
-    event_bg_color.insert(7, blue2);
-    event_bg_color.insert(6, blue2);
-    event_bg_color.insert(5, blue2);
-
-    let green1 = hex("00aeca");
-    event_bg_color.insert(4, green1);
-    event_bg_color.insert(3, green1);
-
-    let green2 = hex("00c0a4");
-    event_bg_color.insert(2, green2);
-    event_bg_color.insert(1, green2);
-    event_bg_color.insert(0, green2);
-
-    event_bg_color
-}
-
-fn get_highlighted_event_bg_color() -> HashMap<usize, Color> {
-    let mut event_bg_color: HashMap<usize, Color> = HashMap::new();
-    let highlight_ratio = 0.5;
-    let purple = lighten(hex("6527b5"), highlight_ratio);
-    event_bg_color.insert(9, purple);
-
-    let blue1 = lighten(hex("005ce1"), highlight_ratio);
-    event_bg_color.insert(8, blue1);
-
-    let blue2 = lighten(hex("0098e7"), highlight_ratio);
-    event_bg_color.insert(7, blue2);
-    event_bg_color.insert(6, blue2);
-    event_bg_color.insert(5, blue2);
-
-    let green1 = lighten(hex("00aeca"), highlight_ratio);
-    event_bg_color.insert(4, green1);
-    event_bg_color.insert(3, green1);
-
-    let green2 = lighten(hex("00c0a4"), highlight_ratio);
-    event_bg_color.insert(2, green2);
-    event_bg_color.insert(1, green2);
-    event_bg_color.insert(0, green2);
-
-    event_bg_color
 }
 
 struct Default;
@@ -109,45 +101,23 @@ struct Default;
 impl StyleSheet for Default {
     fn default(&self) -> Style {
         Style {
-            step_bg_color: lighten(STEP_BORDER_LEFT_COLOR, 0.05),
-            step_bg_color_2: lighten(STEP_BORDER_LEFT_COLOR, 0.12),
-            step_highlight_bg_color: lighten(STEP_BORDER_LEFT_COLOR, 0.3),
-            step_border_left_color: STEP_BORDER_LEFT_COLOR,
-            step_border_left_color_2: STEP_BORDER_LEFT_COLOR_2,
-            step_line_color: STEP_LINE_COLOR,
-            step_line_color_2: STEP_LINE_COLOR_2,
-            event_bg_color: get_event_bg_color(),
-            event_highlight_bg_color: get_highlighted_event_bg_color(),
-            event_border_color: EVENT_BORDER_COLOR,
-            event_highlight_border_color: EVENT_HIGHLIGHT_BORDER_COLOR,
-            event_marker_color: EVENT_MARKER_COLOR,
-            event_highlight_marker_color: EVENT_HIGHLIGHT_MARKER_COLOR,
-            event_selected_color: EVENT_SELECTED_COLOR,
-            event_selected_border_color: EVENT_SELECTED_BORDER_COLOR,
-            event_selected_marker_color: EVENT_SELECTED_MARKER_COLOR,
-            selection_border_color: SELECTION_BORDER_COLOR,
+            event: Event::default(),
+            grid: Grid::default(),
+            background: None,
+
+            selection_stroke: Stroke { color: Color::WHITE, line_width: 1. },
+            selected_track_bg_color: lighten(Color::BLACK, 0.7),
+            current_step_bg_color: lighten(hex("374140"), 0.1)
         }
     }
 
     fn dragging_selection(&self) -> Style {
         Style {
-            step_bg_color: lighten(STEP_BORDER_LEFT_COLOR, 0.05),
-            step_bg_color_2: lighten(STEP_BORDER_LEFT_COLOR, 0.12),
-            step_highlight_bg_color: lighten(STEP_BORDER_LEFT_COLOR, 0.3),
-            step_border_left_color: STEP_BORDER_LEFT_COLOR,
-            step_border_left_color_2: STEP_BORDER_LEFT_COLOR_2,
-            step_line_color: STEP_LINE_COLOR,
-            step_line_color_2: STEP_LINE_COLOR_2,
-            event_bg_color: get_event_bg_color(),
-            event_highlight_bg_color: get_highlighted_event_bg_color(),
-            event_border_color: EVENT_BORDER_COLOR,
-            event_highlight_border_color: EVENT_HIGHLIGHT_BORDER_COLOR,
-            event_marker_color: EVENT_MARKER_COLOR,
-            event_highlight_marker_color: EVENT_HIGHLIGHT_MARKER_COLOR,
-            event_selected_color: EVENT_SELECTED_COLOR,
-            event_selected_border_color: EVENT_SELECTED_BORDER_COLOR,
-            event_selected_marker_color: EVENT_SELECTED_MARKER_COLOR,
-            selection_border_color: SELECTION_BORDER_COLOR,
+            event: Event {
+                stroke: Stroke { color: lighten(Color::BLACK, 0.1), line_width: 1. },
+                ..Event::default()
+            },
+            ..self.default()
         }
     }
 }

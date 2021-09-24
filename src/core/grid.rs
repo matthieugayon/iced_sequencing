@@ -3,7 +3,7 @@ use iced_native::{Point, Rectangle, Size};
 use ganic_no_std::{pattern::Pattern, NUM_PERCS, NUM_STEPS};
 use crate::native::grid::State;
 
-pub const TRACK_MARGIN_BOTTOM: f32 = 3.0;
+pub const TRACK_MARGIN_BOTTOM: f32 = 2.0;
 pub const DEFAULT_VELOCITY: f32 = 1.0;
 pub const OFFSET_THRESHOLD: f32 = 0.05;
 

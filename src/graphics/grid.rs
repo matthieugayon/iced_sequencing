@@ -1,27 +1,31 @@
 use crate::{core::grid::GridEvent, native::grid};
 use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
+use iced_native::Background;
 
 use crate::core::grid::{
     get_event_bounds, get_step_dimensions, 
     GridPattern, TRACK_MARGIN_BOTTOM
 };
-use iced_native::{mouse, Color, Point, Rectangle, Size, Vector};
+use iced_native::{mouse, Point, Rectangle, Size, Vector};
 
 pub use crate::native::grid::State;
 pub use crate::style::color_utils::{darken, lighten};
-pub use crate::style::grid::{Style, StyleSheet};
+pub use crate::style::grid::{Style, StyleSheet, GridColor};
 
 use ganic_no_std::{NUM_PERCS, NUM_STEPS};
 
 pub type Grid<'a, Message, Backend> = grid::Grid<'a, Message, Renderer<Backend>>;
+
+const BEATS: usize = 4;
+const BEAT_STEP_COUNT: usize = NUM_STEPS / 4;
 
 impl<B: Backend> grid::Renderer for Renderer<B> {
     type Style = Box<dyn StyleSheet>;
 
     fn draw(
         &mut self,
-        _bounds: Rectangle,
+        bounds: Rectangle,
         drawable_area: Rectangle,
         _cursor_position: Point,
         grid_pattern: &GridPattern,
@@ -59,20 +63,35 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
             )
         });
 
-        let mut primitives = vec![grid.into_primitive(), steps.into_primitive()];
+        let mut canvas_primitives = vec![grid.into_primitive(), steps.into_primitive()];
 
         match selection {
             Some(selection) => {
-                primitives.push(draw_selection(selection, drawable_area, &style));
+                canvas_primitives.push(draw_selection(selection, drawable_area, &style));
             }
             None => {}
         }
 
-        (
+        let mut primitives = vec![
             Primitive::Translate {
                 translation: Vector::new(drawable_area.x, drawable_area.y),
-                content: Box::new(Primitive::Group { primitives }),
-            },
+                content: Box::new(Primitive::Group { primitives: canvas_primitives }),
+            }
+        ];
+
+        if style.background.is_some() {
+            let background = style.background.unwrap();
+            primitives.push(Primitive::Quad {
+                bounds,
+                background: Background::Color(background.bg_color),
+                border_radius: background.border_radius,
+                border_width: background.border_width,
+                border_color: background.border_color,
+            });
+        }
+
+        (
+            Primitive::Group { primitives },
             mouse_interaction,
         )
     }
@@ -91,8 +110,8 @@ fn draw_selection(selection: Rectangle, bounds: Rectangle, style: &Style) -> Pri
     frame.stroke(
         &area,
         Stroke {
-            width: 1.,
-            color: style.selection_border_color,
+            width: style.selection_stroke.line_width,
+            color: style.selection_stroke.color,
             line_cap: LineCap::Square,
             ..Stroke::default()
         },
@@ -109,36 +128,65 @@ fn draw_grid(
     _highlight: [usize; NUM_PERCS],
     style: &Style,
 ) {
+    // backgrounds
+    for beat in 0..BEATS {
+        // bg color definition
+        let bg_color = match beat {
+            0 | 2 => style.grid.even_beat_bg_color,
+            _ => style.grid.odd_beat_bg_color
+        };
+
+        let beat_width = step_size.width * BEAT_STEP_COUNT as f32;
+        let beat_origin = Point {
+            x: beat as f32 * beat_width + step_size.width,
+            y: 0.,
+        };
+        let beat_size = Size {
+            width: beat_width,
+            height: size.height,
+        };
+
+        let beat_bg = Path::rectangle(beat_origin, beat_size);
+
+        frame.fill(&beat_bg, bg_color);
+    }
+
+    // edges bg 
+    let start_edge = Point { x: 0., y: 0. };
+    let start_edge_size = Size { width: step_size.width, height: size.height };
+    let start_bg = Path::rectangle(start_edge, start_edge_size);
+    frame.fill(&start_bg, style.grid.edge_step_bg_color);
+
+    let end_edge = Point { x: (NUM_STEPS + 1) as f32 * step_size.width, y: 0. };
+    let end_edge_size = Size { width: step_size.width, height: size.height };
+    let end_bg = Path::rectangle(end_edge, end_edge_size);
+    frame.fill(&end_bg, style.grid.edge_step_bg_color);
+    
+    // track margins
     for track in 0..NUM_PERCS {
-        let track_origin = Point {
-            x: 0.,
-            y: track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM),
-        };
-        let track_size = Size {
-            width: size.width,
-            height: step_size.height,
-        };
-
-        let track_bg = Path::rectangle(track_origin, track_size);
-
-        frame.fill(&track_bg, style.step_bg_color_2);
-
-        let offset_origin = Point {
+        let track_margin_origin = Point {
             x: 0.,
             y: track as f32 * (step_size.height + TRACK_MARGIN_BOTTOM) + step_size.height as f32,
         };
 
-        let offset_size = Size {
+        let track_margin_size = Size {
             width: size.width,
             height: TRACK_MARGIN_BOTTOM,
         };
 
-        let offset_bg = Path::rectangle(offset_origin, offset_size);
+        let track_margin_bg = Path::rectangle(track_margin_origin, track_margin_size);
 
-        frame.fill(&offset_bg, style.step_bg_color);
+        frame.fill(&track_margin_bg, style.grid.track_margin_color);
     }
 
-    for step in 0..NUM_STEPS + 1 {
+    for step in 0..=NUM_STEPS {
+        // stroke style definition
+        let stroke = match step {
+            0 | NUM_STEPS => style.grid.edge_step_line,
+            step_index if (step_index / BEAT_STEP_COUNT) % 2 == 1 => style.grid.odd_beat_line,
+            _ => style.grid.even_beat_line
+        };
+
         let step_offset_x = (step + 1) as f32 * step_size.width;
 
         let step_line = Path::line(
@@ -155,8 +203,8 @@ fn draw_grid(
         frame.stroke(
             &step_line,
             Stroke {
-                width: 1.,
-                color: style.step_border_left_color_2,
+                width: stroke.line_width,
+                color: stroke.color,
                 line_cap: LineCap::Square,
                 ..Stroke::default()
             },
@@ -198,15 +246,28 @@ fn draw_steps(
         let event_bounds = get_event_bounds(*step, *track, grid_event.offset, size);
         let step_position = get_event_bounds(*step, *track, 0., size);
 
-        let bg_color = {
+        // Color definitions
+
+        let event_bg_color = match style.event.bg_color {
+            GridColor::Simple(color) => color,
+            GridColor::Multitrack(color_array) => color_array[*track],
+        };
+
+        let slider_bg_color = {
             if highlight[*track] == *step && is_playing {
-                *style.event_highlight_bg_color.get(track).unwrap()
+                style.event.slider_highlighted_bg_color
             } else {
-                *style.event_bg_color.get(track).unwrap()
+                style.event.slider_bg_color
             }
         };
 
+        let slider_fill_color = match slider_bg_color {
+            GridColor::Simple(color) => color,
+            GridColor::Multitrack(color_array) => color_array[*track],
+        };
+
         if grid_event.selected {
+            // selected event contour
             let selected_countour = Path::rectangle(
                 Point {
                     x: event_bounds.x,
@@ -214,8 +275,9 @@ fn draw_steps(
                 },
                 step_size,
             );
-            frame.fill(&selected_countour, style.event_selected_border_color);
-
+            frame.fill(&selected_countour, style.event.contour_bg_color);
+            
+            // event with fill & stroke
             let event = Path::rectangle(
                 Point {
                     x: event_bounds.x + 2.,
@@ -226,33 +288,35 @@ fn draw_steps(
                     height: step_size.height - 4.,
                 },
             );
-            frame.fill(&event, lighten(bg_color, 0.2));
+            frame.fill(&event, event_bg_color);
             frame.stroke(
                 &event,
                 Stroke {
-                    width: 1.,
-                    color: Color::from_rgb(0.36, 0.36, 0.3),
+                    width: style.event.stroke.line_width,
+                    color: style.event.stroke.color,
                     line_cap: LineCap::Square,
                     ..Stroke::default()
                 },
             );
 
-            let slider_inner_height = step_size.height - 6.;
+            let slider_inner_height = step_size.height - 8.;
             let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
             let velocity_top_offset = slider_inner_height - velocity_height;
 
+            // inner slider
             let inner_slider = Path::rectangle(
                 Point {
-                    x: event_bounds.x + 3.,
-                    y: event_bounds.y + 3. + velocity_top_offset,
+                    x: event_bounds.x + 4.,
+                    y: event_bounds.y + 4. + velocity_top_offset,
                 },
                 Size {
-                    width: step_size.width - 6.,
+                    width: step_size.width - 8.,
                     height: velocity_height,
                 },
             );
-            frame.fill(&inner_slider, darken(bg_color, 0.1));
+            frame.fill(&inner_slider, slider_fill_color);
         } else {
+            // event with fill & stroke
             let event = Path::rectangle(
                 Point {
                     x: event_bounds.x,
@@ -260,12 +324,12 @@ fn draw_steps(
                 },
                 step_size,
             );
-            frame.fill(&event, lighten(bg_color, 0.2));
+            frame.fill(&event, event_bg_color);
             frame.stroke(
                 &event,
                 Stroke {
-                    width: 1.,
-                    color: style.event_border_color,
+                    width: style.event.stroke.line_width,
+                    color: style.event.stroke.color,
                     line_cap: LineCap::Square,
                     ..Stroke::default()
                 },
@@ -275,6 +339,7 @@ fn draw_steps(
             let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
             let velocity_top_offset = slider_inner_height - velocity_height;
 
+            // inner slider
             let inner_slider = Path::rectangle(
                 Point {
                     x: event_bounds.x + 1.,
@@ -285,7 +350,7 @@ fn draw_steps(
                     height: velocity_height,
                 },
             );
-            frame.fill(&inner_slider, darken(bg_color, 0.1));
+            frame.fill(&inner_slider, slider_fill_color);
         }
 
         if grid_event.offset > 0. {
@@ -299,7 +364,7 @@ fn draw_steps(
                     height: 2.,
                 },
             );
-            frame.fill(&offset, style.event_marker_color.0);
+            frame.fill(&offset, style.event.positive_offset_marker_bg_color);
         } else if grid_event.offset < 0. {
             let offset = Path::rectangle(
                 Point {
@@ -311,7 +376,7 @@ fn draw_steps(
                     height: 2.,
                 },
             );
-            frame.fill(&offset, style.event_marker_color.1);
+            frame.fill(&offset, style.event.negative_offset_marker_bg_color);
         }
     });
 }
