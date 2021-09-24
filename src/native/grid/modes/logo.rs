@@ -61,6 +61,8 @@ impl WidgetState for Logo {
             self.next(new_state);
         }
 
+        context.mouse_interaction = mouse::Interaction::default();
+
         (Transition::DoNothing, messages)
     }
 

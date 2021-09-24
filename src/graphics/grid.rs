@@ -18,7 +18,7 @@ use ganic_no_std::{NUM_PERCS, NUM_STEPS};
 pub type Grid<'a, Message, Backend> = grid::Grid<'a, Message, Renderer<Backend>>;
 
 const BEATS: usize = 4;
-const BEAT_STEP_COUNT: usize = NUM_STEPS / 4;
+const BEAT_STEP_COUNT: usize = NUM_STEPS / BEATS;
 
 impl<B: Backend> grid::Renderer for Renderer<B> {
     type Style = Box<dyn StyleSheet>;
@@ -280,15 +280,32 @@ fn draw_steps(
             // event with fill & stroke
             let event = Path::rectangle(
                 Point {
-                    x: event_bounds.x + 2.,
-                    y: event_bounds.y + 2.,
+                    x: event_bounds.x + style.event.contour_width,
+                    y: event_bounds.y + style.event.contour_width,
                 },
                 Size {
-                    width: step_size.width - 4.,
-                    height: step_size.height - 4.,
+                    width: step_size.width - (style.event.contour_width * 2.),
+                    height: step_size.height - (style.event.contour_width * 2.),
                 },
             );
             frame.fill(&event, event_bg_color);
+
+            let slider_inner_height = step_size.height - (style.event.contour_width * 2.);
+            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+            let velocity_top_offset = slider_inner_height - velocity_height;
+
+            // inner slider
+            let inner_slider = Path::rectangle(
+                Point {
+                    x: event_bounds.x + style.event.contour_width,
+                    y: event_bounds.y + style.event.contour_width + velocity_top_offset,
+                },
+                Size {
+                    width: step_size.width - (style.event.contour_width * 2.),
+                    height: velocity_height,
+                },
+            );
+            frame.fill(&inner_slider, slider_fill_color);
             frame.stroke(
                 &event,
                 Stroke {
@@ -298,23 +315,6 @@ fn draw_steps(
                     ..Stroke::default()
                 },
             );
-
-            let slider_inner_height = step_size.height - 8.;
-            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
-            let velocity_top_offset = slider_inner_height - velocity_height;
-
-            // inner slider
-            let inner_slider = Path::rectangle(
-                Point {
-                    x: event_bounds.x + 4.,
-                    y: event_bounds.y + 4. + velocity_top_offset,
-                },
-                Size {
-                    width: step_size.width - 8.,
-                    height: velocity_height,
-                },
-            );
-            frame.fill(&inner_slider, slider_fill_color);
         } else {
             // event with fill & stroke
             let event = Path::rectangle(
@@ -325,6 +325,23 @@ fn draw_steps(
                 step_size,
             );
             frame.fill(&event, event_bg_color);
+
+            let slider_inner_height = step_size.height;
+            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
+            let velocity_top_offset = slider_inner_height - velocity_height;
+
+            // inner slider
+            let inner_slider = Path::rectangle(
+                Point {
+                    x: event_bounds.x,
+                    y: event_bounds.y+ velocity_top_offset,
+                },
+                Size {
+                    width: step_size.width,
+                    height: velocity_height,
+                },
+            );
+            frame.fill(&inner_slider, slider_fill_color);
             frame.stroke(
                 &event,
                 Stroke {
@@ -334,23 +351,6 @@ fn draw_steps(
                     ..Stroke::default()
                 },
             );
-
-            let slider_inner_height = step_size.height - 2.;
-            let velocity_height = (slider_inner_height * grid_event.velocity).ceil();
-            let velocity_top_offset = slider_inner_height - velocity_height;
-
-            // inner slider
-            let inner_slider = Path::rectangle(
-                Point {
-                    x: event_bounds.x + 1.,
-                    y: event_bounds.y + 1. + velocity_top_offset,
-                },
-                Size {
-                    width: step_size.width - 2.,
-                    height: velocity_height,
-                },
-            );
-            frame.fill(&inner_slider, slider_fill_color);
         }
 
         if grid_event.offset > 0. {

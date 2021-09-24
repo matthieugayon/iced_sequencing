@@ -52,11 +52,11 @@ impl std::default::Default for Grid {
     fn default() -> Self {
         Grid {
             even_beat_bg_color: hex("374140"),
-            odd_beat_bg_color: hex("374140"),
+            odd_beat_bg_color: darken(hex("374140"), 0.2),
             edge_step_bg_color: hex("BDC3C7"),
 
             even_beat_line: Stroke { color: hex("2A2C2B"), line_width: 1. },
-            odd_beat_line: Stroke { color: hex("2A2C2B"), line_width: 1. },
+            odd_beat_line: Stroke { color: darken(hex("2A2C2B"), 0.2), line_width: 1. },
             edge_step_line: Stroke { color: lighten(hex("2A2C2B"), 0.1), line_width: 1. },
             track_margin_color: hex("2A2C2B")
         }
@@ -67,6 +67,7 @@ impl std::default::Default for Grid {
 pub struct Event {
     // BACKGROUNDS
     pub contour_bg_color: Color,
+    pub contour_width: f32,
     pub bg_color: GridColor,
     pub stroke: Stroke,
     pub slider_bg_color: GridColor,
@@ -80,6 +81,7 @@ impl std::default::Default for Event {
     fn default() -> Self {
         Event {
             contour_bg_color: hex("BDC3C7"),
+            contour_width: 2.,
             bg_color: GridColor::Simple(hex("D9CB9E")),
             stroke: Stroke { color: hex("24272a"), line_width: 1. },
             slider_bg_color: GridColor::Simple(hex("ff7d00")),

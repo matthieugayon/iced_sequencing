@@ -63,6 +63,8 @@ impl WidgetState for Idle {
             self.next(new_state);
         }
 
+        context.mouse_interaction = mouse::Interaction::default();
+
         (Transition::DoNothing, messages)
     }
 
@@ -335,18 +337,6 @@ impl WidgetState for Selecting {
         context.selection_rectangle = None;
 
         (Transition::ChangeState(Box::new(Waiting::default())), None)
-    }
-
-    fn on_modifier_change(
-        &mut self,
-        modifiers: keyboard::Modifiers,
-        _context: &mut WidgetContext,
-    ) -> (Transition, Option<Vec<GridMessage>>) {
-        if modifiers.logo() {
-            (Transition::ChangeState(Box::new(Logo::default())), None)
-        } else {
-            (Transition::DoNothing, None)
-        }
     }
 }
 

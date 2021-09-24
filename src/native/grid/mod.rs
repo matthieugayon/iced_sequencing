@@ -327,6 +327,13 @@ where
                         self.state.last_click = Some(click);
 
                         return event::Status::Captured;
+                    } else {
+                        self.handle_event(
+                            |widget_state, _context, _base_pattern| {
+                                widget_state.on_blur()
+                            },
+                            messages,
+                        );
                     }
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => {

@@ -15,8 +15,7 @@ pub trait WidgetState: Debug {
     fn on_cancelled(&mut self, _context: &mut WidgetContext) {}
     
     fn on_blur(
-        &mut self, 
-        _context: &mut WidgetContext
+        &mut self
     ) -> (Transition, Option<Vec<GridMessage>>) {
         (Transition::DoNothing, Some(vec![GridMessage::EmptySelection()]))
     }

@@ -5,7 +5,7 @@ use crate::core::grid::{
     get_hovered_track, get_hovered_step, get_step_width, 
     GridMessage, GridPattern
 };
-use iced_native::{keyboard, Point, Rectangle};
+use iced_native::{keyboard, Point, Rectangle, mouse};
 
 #[derive(Debug)]
 pub struct Shift {
@@ -62,6 +62,8 @@ impl WidgetState for Shift {
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
         }
+
+        context.mouse_interaction = mouse::Interaction::default();
 
         (Transition::DoNothing, messages)
     }
