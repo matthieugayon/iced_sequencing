@@ -191,6 +191,7 @@ impl State {
     }
 
     pub fn transport(&mut self, highlight: [Option<usize>; NUM_PERCS]) {
+        self.event_cache.clear();
         for (pidx, option_step) in highlight.iter().enumerate() {
             match option_step {
                 Some(step) => self.highlight[NUM_PERCS - pidx - 1] = *step,

@@ -63,8 +63,18 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
             )
         });
 
-        let mut canvas_primitives = vec![grid.into_primitive(), steps.into_primitive()];
+        // 1. grid
+        let mut canvas_primitives = vec![grid.into_primitive()];
 
+        // 2. highlighted steps
+        if is_playing {
+            canvas_primitives.push(draw_highlight(drawable_area.size(), highlight, &style));
+        }
+
+        // 3. events
+        canvas_primitives.push(steps.into_primitive());
+
+        // 4. selection
         match selection {
             Some(selection) => {
                 canvas_primitives.push(draw_selection(selection, drawable_area, &style));
@@ -210,6 +220,27 @@ fn draw_grid(
             },
         );
     }
+}
+
+fn draw_highlight(
+    size: Size,
+    highlight: [usize; NUM_PERCS],
+    style: &Style,
+) -> Primitive {
+    let mut frame = Frame::new(size);
+    
+    let highlighted_steps = Path::new(|path| {
+        for (track , highlighted_step) in highlight.iter().enumerate() {
+            let event_bounds = get_event_bounds(*highlighted_step, track, 0., size);
+            path.rectangle(event_bounds.position(), event_bounds.size());
+        }
+
+        path.close();
+    });
+
+    frame.fill(&highlighted_steps, style.current_step_bg_color);
+
+    Geometry::into_primitive(frame.into_geometry())
 }
 
 fn draw_steps(
