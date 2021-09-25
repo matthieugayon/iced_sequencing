@@ -196,7 +196,7 @@ fn draw_grid(
             },
             Point {
                 x: step_offset_x,
-                y: size.height,
+                y: size.height - TRACK_MARGIN_BOTTOM,
             },
         );
 

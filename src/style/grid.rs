@@ -48,17 +48,25 @@ pub struct Grid {
     pub track_margin_color: Color
 }
 
+// shades => dark to light
+// #1A2122
+// #1f2829
+// #252f30
+// #2a3637
+// #303d3e
+// #354345
+
 impl std::default::Default for Grid {
     fn default() -> Self {
         Grid {
-            even_beat_bg_color: hex("374140"),
-            odd_beat_bg_color: darken(hex("374140"), 0.2),
-            edge_step_bg_color: hex("BDC3C7"),
+            even_beat_bg_color: hex("2a3637"),
+            odd_beat_bg_color: hex("252f30"),
+            edge_step_bg_color: hex("1f2829"),
 
-            even_beat_line: Stroke { color: hex("2A2C2B"), line_width: 1. },
-            odd_beat_line: Stroke { color: darken(hex("2A2C2B"), 0.2), line_width: 1. },
-            edge_step_line: Stroke { color: lighten(hex("2A2C2B"), 0.1), line_width: 1. },
-            track_margin_color: hex("2A2C2B")
+            even_beat_line: Stroke { color: hex("1A2122"), line_width: 0.5 },
+            odd_beat_line: Stroke { color: hex("1A2122"), line_width: 0.5 },
+            edge_step_line: Stroke { color: darken(hex("2a3637"), 0.14), line_width: 1. },
+            track_margin_color: hex("1A2122")
         }
     }
 }
@@ -80,14 +88,47 @@ pub struct Event {
 impl std::default::Default for Event {
     fn default() -> Self {
         Event {
-            contour_bg_color: hex("BDC3C7"),
-            contour_width: 2.,
-            bg_color: GridColor::Simple(hex("D9CB9E")),
-            stroke: Stroke { color: hex("24272a"), line_width: 1. },
-            slider_bg_color: GridColor::Simple(hex("ff7d00")),
-            slider_highlighted_bg_color: GridColor::Simple(darken(hex("ff7d00"), 0.1)),
-            negative_offset_marker_bg_color: hex("7d00ff"),
-            positive_offset_marker_bg_color: hex("00ff7d")
+            contour_bg_color: hex("eff0f1"),
+            contour_width: 3.,
+            bg_color: GridColor::Multitrack([
+                lighten(hex("ff7e53"), 0.15),
+                lighten(hex("eb8c63"), 0.15),
+                lighten(hex("d69a73"), 0.15),
+                lighten(hex("c2a883"), 0.15),
+                lighten(hex("aeb693"), 0.15),
+                lighten(hex("99c4a4"), 0.15),
+                lighten(hex("85d2b4"), 0.15),
+                lighten(hex("71e0c4"), 0.15),
+                lighten(hex("5ceed4"), 0.15),
+                lighten(hex("48fce4"), 0.15),
+            ]),
+            stroke: Stroke { color: hex("000"), line_width: 1. },
+            slider_bg_color: GridColor::Multitrack([
+                hex("ff7e53"),
+                hex("eb8c63"),
+                hex("d69a73"),
+                hex("c2a883"),
+                hex("aeb693"),
+                hex("99c4a4"),
+                hex("85d2b4"),
+                hex("71e0c4"),
+                hex("5ceed4"),
+                hex("48fce4")
+            ]),
+            slider_highlighted_bg_color: GridColor::Multitrack([
+                lighten(hex("ff7e53"), 0.21),
+                lighten(hex("eb8c63"), 0.21),
+                lighten(hex("d69a73"), 0.21),
+                lighten(hex("c2a883"), 0.21),
+                lighten(hex("aeb693"), 0.21),
+                lighten(hex("99c4a4"), 0.21),
+                lighten(hex("85d2b4"), 0.21),
+                lighten(hex("71e0c4"), 0.21),
+                lighten(hex("5ceed4"), 0.21),
+                lighten(hex("48fce4"), 0.21),
+            ]),
+            negative_offset_marker_bg_color: hex("fc4860"),
+            positive_offset_marker_bg_color: hex("48bafc")
         }
     }
 }
@@ -98,16 +139,16 @@ pub trait StyleSheet {
     fn dragging_selection(&self) -> Style;
 }
 
-struct Default;
+pub struct MyDefault;
 
-impl StyleSheet for Default {
+impl StyleSheet for MyDefault {
     fn default(&self) -> Style {
         Style {
             event: Event::default(),
             grid: Grid::default(),
             background: None,
 
-            selection_stroke: Stroke { color: Color::WHITE, line_width: 1. },
+            selection_stroke: Stroke { color: hex("8ea5a8"), line_width: 0.7 },
             selected_track_bg_color: lighten(Color::BLACK, 0.7),
             current_step_bg_color: lighten(hex("374140"), 0.1)
         }
@@ -126,7 +167,7 @@ impl StyleSheet for Default {
 
 impl std::default::Default for Box<dyn StyleSheet> {
     fn default() -> Self {
-        Box::new(Default)
+        Box::new(MyDefault)
     }
 }
 

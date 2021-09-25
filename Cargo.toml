@@ -10,7 +10,8 @@ resolver = "2"
 [workspace]
 
 members = [
-    "examples/simple"
+    "examples/simple",
+    "examples/grid_designer"
 ]
 
 [dev-dependencies]

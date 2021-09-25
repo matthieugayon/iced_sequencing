@@ -15,13 +15,20 @@ pub fn darken(color: Color, amount: f32) -> Color {
     Color::from_rgb(srgb_color.red, srgb_color.green, srgb_color.blue)
 }
 
-pub fn from_hex(hex: &str) -> (f32, f32, f32) {
+pub fn from_hex_unsafe(hex: &str) -> (f32, f32, f32) {
     let rgb: Rgb = Rgb::from_hex_str(hex).unwrap();
     rgb.as_tuple()
 }
 
+pub fn from_hex(hex: &str) -> Option<(f32, f32, f32)> {
+    match Rgb::from_hex_str(hex) {
+        Ok(rgb) => Some(rgb.as_tuple()),
+        Err(_) => None,
+    }
+}
+
 pub fn hex(hex_str: &str) -> Color {
-    let color_tuple = from_hex(hex_str);
+    let color_tuple = from_hex_unsafe(hex_str);
     Color::from_rgb(
         color_tuple.0 / 255.,
         color_tuple.1 / 255.,

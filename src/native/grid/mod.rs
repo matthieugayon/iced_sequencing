@@ -11,7 +11,7 @@ use std::hash::Hash;
 
 use ganic_no_std::NUM_PERCS;
 
-use crate::core::grid::{GridMessage, GridPattern, Target};
+use crate::core::grid::{GridMessage, GridPattern};
 
 pub mod modes;
 
@@ -65,6 +65,8 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
     }
 
     pub fn style(mut self, style: impl Into<Renderer::Style>) -> Self {
+        self.state.event_cache.clear();
+        self.state.grid_cache.clear();
         self.style = style.into();
         self
     }
@@ -87,37 +89,11 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
 
         match grid_messages {
             Some(messages) => {
+                // clear event cache to update events display
+                self.state.event_cache.clear();
+
                 messages.into_iter().for_each(|message| {
-                    // clear event cache to update events display
-                    self.state.event_cache.clear();
-
                     messages_queue.push((self.on_event)(message));
-                   
-                    // match message.target.clone() {
-                    //     Target::UI => {
-                    //         self.state.event_cache.clear();
-                    //     },
-                    //     _ => {},
-                    // }
-
-                    // match message {
-                    //     GridMessage::NewPattern(grid, target) => {
-                    //         let next_pattern = Pattern::from(grid);
-                    //         match target {
-                    //             PatternTarget::UI => {
-                    //                 messages_queue.push((self.on_ui_change)(next_pattern));
-                    //             },
-                    //             PatternTarget::STATE => {
-                    //                 messages_queue.push((self.on_state_change)(next_pattern));
-                    //             }
-                    //         }
-                    //     },
-                    //     GridMessage::TrackSelected(track_index) => {
-                    //         // reverse index
-                    //         let track = NUM_PERCS - track_index - 1;
-                    //         messages_queue.push((self.on_track_focus)(track))
-                    //     },
-                    // }
                 });
             }
             None => {}
