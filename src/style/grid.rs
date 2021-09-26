@@ -16,7 +16,6 @@ pub enum GridColor {
     Multitrack([Color; NUM_PERCS])
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct Stroke {
     pub color: Color,
@@ -116,16 +115,16 @@ impl std::default::Default for Event {
                 hex("48fce4")
             ]),
             slider_highlighted_bg_color: GridColor::Multitrack([
-                lighten(hex("ff7e53"), 0.21),
-                lighten(hex("eb8c63"), 0.21),
-                lighten(hex("d69a73"), 0.21),
-                lighten(hex("c2a883"), 0.21),
-                lighten(hex("aeb693"), 0.21),
-                lighten(hex("99c4a4"), 0.21),
-                lighten(hex("85d2b4"), 0.21),
-                lighten(hex("71e0c4"), 0.21),
-                lighten(hex("5ceed4"), 0.21),
-                lighten(hex("48fce4"), 0.21),
+                darken(hex("ff7e53"), 0.2),
+                darken(hex("eb8c63"), 0.2),
+                darken(hex("d69a73"), 0.2),
+                darken(hex("c2a883"), 0.2),
+                darken(hex("aeb693"), 0.2),
+                darken(hex("99c4a4"), 0.2),
+                darken(hex("85d2b4"), 0.2),
+                darken(hex("71e0c4"), 0.2),
+                darken(hex("5ceed4"), 0.2),
+                darken(hex("48fce4"), 0.2),
             ]),
             negative_offset_marker_bg_color: hex("fc4860"),
             positive_offset_marker_bg_color: hex("48bafc")
@@ -150,7 +149,7 @@ impl StyleSheet for MyDefault {
 
             selection_stroke: Stroke { color: hex("8ea5a8"), line_width: 0.7 },
             selected_track_bg_color: lighten(Color::BLACK, 0.7),
-            current_step_bg_color: lighten(hex("374140"), 0.1)
+            current_step_bg_color: hex("303d3e")
         }
     }
 

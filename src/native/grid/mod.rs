@@ -155,9 +155,9 @@ impl State {
     }
 
     pub fn set_pattern(&mut self, grid: GridPattern) {
-        self.base_pattern = grid;
+        self.event_cache.clear();
         self.temp_movement = None;
-        // self.event_cache.clear();
+        self.base_pattern = grid;
     }
 
     pub fn set_movement(&mut self, movement: (f32, isize), relative: bool) {
