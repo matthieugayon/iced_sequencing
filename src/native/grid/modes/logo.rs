@@ -360,9 +360,10 @@ struct SetVelocity {
 
 impl SetVelocity {
     fn from_args(point: Point) -> Self {
-        // todo: make edit_speed customizable
-        // edit_speed is set to 2.0 by default but could be lowered if shift is pressed for example
         SetVelocity { origin: point, edit_speed: 2.0 }
+    }
+    fn set_edit_speed(&mut self, edit_speed: f32) {
+        self.edit_speed = edit_speed;
     }
 }
 
@@ -374,8 +375,7 @@ impl WidgetState for SetVelocity {
         _base_pattern: GridPattern,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        let ratio = ((self.origin.y - cursor.y) * self.edit_speed)
-            .min(127.).max(-127.) / 127.;
+        let ratio = ((self.origin.y - cursor.y) * self.edit_speed).min(127.).max(-127.) / 127.;
         self.origin.y = cursor.y; // reset origin with current cursor position
 
         (
@@ -402,7 +402,10 @@ impl WidgetState for SetVelocity {
         modifiers: keyboard::Modifiers,
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if !modifiers.logo() {
+        if modifiers.shift() {
+            self.set_edit_speed(0.5);
+            (Transition::DoNothing, None)
+        } else if !modifiers.logo() {
             context.mouse_interaction = mouse::Interaction::default();
             (
                 Transition::ChangeParentState(Box::new(Idle::default())),
