@@ -355,15 +355,14 @@ impl WidgetState for Selecting {
 #[derive(Debug, Default)]
 struct SetVelocity {
     origin: Point,
-    increment_factor: f32
+    edit_speed: f32
 }
 
 impl SetVelocity {
     fn from_args(point: Point) -> Self {
-        // todo: make increment_factor customizable
-        // increment_factor is set to 2.0 by default but
-        // could be lowered if shift is pressed for example
-        SetVelocity { origin: point, increment_factor: 2.0 }
+        // todo: make edit_speed customizable
+        // edit_speed is set to 2.0 by default but could be lowered if shift is pressed for example
+        SetVelocity { origin: point, edit_speed: 2.0 }
     }
 }
 
@@ -375,7 +374,7 @@ impl WidgetState for SetVelocity {
         _base_pattern: GridPattern,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        let ratio = ((self.origin.y - cursor.y) * self.increment_factor)
+        let ratio = ((self.origin.y - cursor.y) * self.edit_speed)
             .min(127.).max(-127.) / 127.;
         self.origin.y = cursor.y; // reset origin with current cursor position
 
