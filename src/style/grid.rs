@@ -62,8 +62,8 @@ impl std::default::Default for Grid {
             odd_beat_bg_color: hex("252f30"),
             edge_step_bg_color: hex("1f2829"),
 
-            even_beat_line: Stroke { color: hex("1A2122"), line_width: 0.5 },
-            odd_beat_line: Stroke { color: hex("1A2122"), line_width: 0.5 },
+            even_beat_line: Stroke { color: hex("1A2122"), line_width: 1.0 },
+            odd_beat_line: Stroke { color: hex("1A2122"), line_width: 1.0 },
             edge_step_line: Stroke { color: darken(hex("2a3637"), 0.14), line_width: 1. },
             track_margin_color: hex("1A2122")
         }
@@ -147,7 +147,7 @@ impl StyleSheet for MyDefault {
             grid: Grid::default(),
             background: None,
 
-            selection_stroke: Stroke { color: hex("8ea5a8"), line_width: 0.7 },
+            selection_stroke: Stroke { color: hex("8ea5a8"), line_width: 1.0 },
             selected_track_bg_color: lighten(Color::BLACK, 0.7),
             current_step_bg_color: hex("303d3e")
         }
