@@ -1,5 +1,5 @@
 use super::Idle;
-use super::Logo;
+use super::LogoCtrl;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
     get_hovered_track, get_hovered_step, get_step_width, 
@@ -214,12 +214,12 @@ impl WidgetState for Waiting {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if modifiers.logo() {
+        if modifiers.logo() || modifiers.control() {
             (
-                Transition::ChangeParentState(Box::new(Logo::default())),
+                Transition::ChangeParentState(Box::new(LogoCtrl::default())),
                 None,
             )
-        } else if !modifiers.shift() && !modifiers.logo() {
+        } else if !modifiers.shift() && !modifiers.logo() && !modifiers.control() {
             (
                 Transition::ChangeParentState(Box::new(Idle::default())),
                 None,
@@ -299,12 +299,12 @@ impl WidgetState for Selecting {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if modifiers.logo() {
+        if modifiers.logo() || modifiers.control() {
             (
-                Transition::ChangeParentState(Box::new(Logo::selecting(self.origin))),
+                Transition::ChangeParentState(Box::new(LogoCtrl::selecting(self.origin))),
                 None,
             )
-        } else if !modifiers.shift() && !modifiers.logo() {
+        } else if !modifiers.shift() && !modifiers.logo() && !modifiers.control() {
             (
                 Transition::ChangeParentState(Box::new(Idle::selecting(self.origin))),
                 None,

@@ -3,7 +3,7 @@ mod logo;
 mod shift;
 
 pub use idle::Idle;
-pub use logo::Logo;
+pub use logo::LogoCtrl;
 pub use shift::Shift;
 
 use super::WidgetContext;
