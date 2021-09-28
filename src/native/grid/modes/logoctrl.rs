@@ -406,12 +406,14 @@ impl WidgetState for SetVelocity {
             self.set_edit_speed(0.5);
             (Transition::DoNothing, None)
         } else if !modifiers.logo() && !modifiers.control() {
+            self.set_edit_speed(2.0);
             context.mouse_interaction = mouse::Interaction::default();
             (
                 Transition::ChangeParentState(Box::new(Idle::default())),
                 None,
             )
         } else {
+            self.set_edit_speed(2.0);
             (Transition::DoNothing, None)
         }
     }
