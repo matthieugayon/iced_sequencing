@@ -1,9 +1,9 @@
 mod idle;
-mod logo;
+mod logoctrl;
 mod shift;
 
 pub use idle::Idle;
-pub use logo::LogoCtrl;
+pub use logoctrl::LogoCtrl;
 pub use shift::Shift;
 
 use super::WidgetContext;
