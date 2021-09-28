@@ -1,4 +1,4 @@
-use super::Logo;
+use super::LogoCtrl;
 use super::Shift;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
@@ -241,9 +241,9 @@ impl WidgetState for Waiting {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if modifiers.logo() {
+        if modifiers.logo() || modifiers.control() {
             (
-                Transition::ChangeParentState(Box::new(Logo::default())),
+                Transition::ChangeParentState(Box::new(LogoCtrl::default())),
                 None,
             )
         } else if modifiers.shift() {
@@ -389,7 +389,7 @@ impl WidgetState for MovingSelectionQuantized {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if modifiers.logo() {
+        if modifiers.logo() || modifiers.control() {
             (
                 Transition::ChangeState(Box::new(MovingSelectionUnquantized::from_args(
                     self.origin,
@@ -470,7 +470,7 @@ impl WidgetState for MovingSelectionUnquantized {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if !modifiers.logo() {
+        if !modifiers.logo() && !modifiers.control() {
             (
                 Transition::ChangeState(Box::new(MovingSelectionQuantized::from_args(
                     self.origin,

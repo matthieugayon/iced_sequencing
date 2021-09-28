@@ -6,11 +6,11 @@ use crate::core::grid::{
 use iced_native::{keyboard, mouse, Point, Rectangle};
 
 #[derive(Debug)]
-pub struct Logo {
+pub struct LogoCtrl {
     nested: Box<dyn WidgetState + Send>,
 }
 
-impl WidgetState for Logo {
+impl WidgetState for LogoCtrl {
     fn on_click(
         &mut self,
         bounds: Rectangle,
@@ -127,17 +127,17 @@ impl WidgetState for Logo {
     }
 }
 
-impl Default for Logo {
-    fn default() -> Logo {
-        Logo {
+impl Default for LogoCtrl {
+    fn default() -> LogoCtrl {
+        LogoCtrl {
             nested: Box::new(Waiting),
         }
     }
 }
 
-impl Logo {
-    pub fn selecting(point: Point) -> Logo {
-        Logo {
+impl LogoCtrl {
+    pub fn selecting(point: Point) -> LogoCtrl {
+        LogoCtrl {
             nested: Box::new(Selecting::from_args(point)),
         }
     }
@@ -260,7 +260,7 @@ impl WidgetState for Waiting {
         modifiers: keyboard::Modifiers,
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if !modifiers.logo() {
+        if !modifiers.logo() && !modifiers.control() {
             context.mouse_interaction = mouse::Interaction::default();
             (
                 Transition::ChangeParentState(Box::new(Idle::default())),
@@ -341,7 +341,7 @@ impl WidgetState for Selecting {
         modifiers: keyboard::Modifiers,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        if !modifiers.logo() {
+        if !modifiers.logo() && !modifiers.control() {
             (
                 Transition::ChangeParentState(Box::new(Idle::selecting(self.origin))),
                 None,
@@ -405,13 +405,15 @@ impl WidgetState for SetVelocity {
         if modifiers.shift() {
             self.set_edit_speed(0.5);
             (Transition::DoNothing, None)
-        } else if !modifiers.logo() {
+        } else if !modifiers.logo() && !modifiers.control() {
+            self.set_edit_speed(2.0);
             context.mouse_interaction = mouse::Interaction::default();
             (
                 Transition::ChangeParentState(Box::new(Idle::default())),
                 None,
             )
         } else {
+            self.set_edit_speed(2.0);
             (Transition::DoNothing, None)
         }
     }
