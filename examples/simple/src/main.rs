@@ -65,8 +65,9 @@ impl Sandbox for App {
     type Message = Message;
 
     fn new() -> App {
-        let test = Item::new(None);
-        let initial_pattern = GridPattern::from(test.data.unwrap());
+        let pattern = Pattern::new_test();
+        let test = Item::new(pattern);
+        let initial_pattern = GridPattern::from(pattern);
 
         App {
             add_snapshot_button: button::State::new(),
@@ -92,11 +93,11 @@ impl Sandbox for App {
 
                 self.snapshot_list.replace(
                     self.current_snapshot, 
-                    Item::new(Some(Pattern::from(self.live_pattern.clone())))
+                    Item::new(Pattern::from(self.live_pattern.clone()))
                 );
             },
             Message::SetVelocities(values) => {
-                let mut current_snapshot = self.snapshot_list.get_mut(self.current_snapshot).unwrap().data.unwrap();                
+                let mut current_snapshot = self.snapshot_list.get_mut(self.current_snapshot).unwrap().data;                
                 values.into_iter()
                     .enumerate()
                     .for_each(|(step, vel)| {
@@ -104,7 +105,7 @@ impl Sandbox for App {
                     });
 
                 // update snapshot list state
-                self.snapshot_list.replace(self.current_snapshot, Item::new(Some(current_snapshot)));
+                self.snapshot_list.replace(self.current_snapshot, Item::new(current_snapshot));
 
                 // update grid state
                 self.grid_state.set_pattern(GridPattern::from(current_snapshot));
@@ -121,11 +122,11 @@ impl Sandbox for App {
                 self.current_snapshot = index;
 
                 // update grid state
-                let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
+                let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data;
                 self.grid_state.set_pattern(GridPattern::from(current_snapshot));
             },
             Message::AddSnapshotPressed => {
-                self.snapshot_list.push(Item::new(Some(Pattern::new_test())))
+                self.snapshot_list.push(Item::new(Pattern::new_test()))
             },
             Message::Delete(delete_index) => {
                 // we first need to correct current snappshot index
@@ -142,7 +143,7 @@ impl Sandbox for App {
                     self.current_snapshot = new_index;
 
                     // update grid state
-                    let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data.unwrap();
+                    let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data;
                     self.grid_state.set_pattern(GridPattern::from(current_snapshot));
                 }
                 
@@ -155,7 +156,6 @@ impl Sandbox for App {
         let current_velocities = self.snapshot_list.get(self.current_snapshot)
             .unwrap()
             .data
-            .unwrap()
             .velocities(self.focused_track)
             .to_vec();
 
@@ -169,7 +169,7 @@ impl Sandbox for App {
                     
                 let is_focused = current_snapshot == pane_index;
                 let snapshot = snapshot::Snapshot::new(
-                        pane.data,
+                        GridPattern::from(pane.data),
                         Length::Fill,
                         Length::Fill
                     )
@@ -229,7 +229,7 @@ impl Sandbox for App {
 
 #[derive(Debug, Clone)]
 struct Item {
-    pub data: Option<Pattern>,
+    pub data: Pattern,
     pub controls: Controls,
 }
 
@@ -239,18 +239,9 @@ struct Controls {
 }
 
 impl Item {
-    fn new(pattern: Option<Pattern>) -> Self {
-        let data = match pattern {
-            Some(patt) => {
-                Some(patt)
-            },
-            None => {
-                Some(Pattern::new_test())
-            },
-        };
-
+    fn new(pattern: Pattern) -> Self {
         Self {
-            data,
+            data: pattern,
             controls: Controls::new()
         }
     }

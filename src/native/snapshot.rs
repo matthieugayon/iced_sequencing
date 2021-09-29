@@ -26,14 +26,7 @@ where
     Message: Clone,
     Renderer: self::Renderer,
 {
-    pub fn new(pattern: Option<Pattern>, width: Length, height: Length) -> Self {
-        let pattern = {
-            match pattern {
-                Some(pattern) => GridPattern::from(pattern),
-                None => GridPattern::new(),
-            }
-        };
-
+    pub fn new(pattern: GridPattern, width: Length, height: Length) -> Self {
         Snapshot {
             pattern,
             selected: false,
