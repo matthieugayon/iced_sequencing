@@ -46,7 +46,7 @@ pub enum Message {
 
 pub fn main() {
     App::run(Settings {
-        antialiasing: true,
+        antialiasing: false,
         ..Settings::default()
     }).unwrap();
 }
@@ -85,7 +85,7 @@ impl Sandbox for App {
     }
 
     fn update(&mut self, event: Message) {
-        println!("--- update {:?}", event);
+        // println!("--- update {:?}", event);
 
         match event {
             Message::GridEvent(grid_message) => {

@@ -2,7 +2,7 @@ use super::LogoCtrl;
 use super::Shift;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
-    get_hovered_step, get_hovered_track, get_step_width, 
+    get_hovered_step, get_hovered_track, get_step_width,
     GridEvent, GridMessage, GridPattern
 };
 use iced_native::{keyboard, mouse, Point, Rectangle};
@@ -120,11 +120,6 @@ impl WidgetState for Idle {
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState + Send>) {
-        // println!("Idle: changing sub state {:?} => {:?}",
-        //     self.nested,
-        //     next_state
-        // );
-
         self.nested = next_state;
     }
 }
@@ -202,17 +197,14 @@ impl WidgetState for Waiting {
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let mut grid_messages = vec![
             GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
+            GridMessage::EmptySelection()
         ];
 
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
-            // if yes remove event
+            // if yes select only this event and start grabbing
             Some(((step, track), grid_event)) => {
-                if !grid_event.selected {
-                    println!("event not selected");
-                    grid_messages.push(GridMessage::EmptySelection());
-                    grid_messages.push(GridMessage::SelectOne((*step, *track)))
-                }
+                grid_messages.push(GridMessage::SelectOne((*step, *track)));
 
                 context.mouse_interaction = mouse::Interaction::Grab;
 
@@ -224,15 +216,11 @@ impl WidgetState for Waiting {
                     Some(grid_messages),
                 )
             }
-            // otherwise add event
-            None => {
-                grid_messages.push(GridMessage::EmptySelection());
-
-                (
-                    Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
-                    Some(grid_messages),
-                )
-            }
+            // otherwise change to area selection mode
+            None => (
+                Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
+                Some(grid_messages),
+            )
         }
     }
 
@@ -281,9 +269,7 @@ struct Selecting {
 }
 
 impl Selecting {
-    fn from_args(point: Point) -> Self {
-        Selecting { origin: point }
-    }
+    fn from_args(point: Point) -> Self { Selecting { origin: point } }
 }
 
 impl WidgetState for Selecting {

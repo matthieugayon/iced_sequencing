@@ -92,7 +92,7 @@ impl<'a> Sandbox for App {
     }
 
     fn update(&mut self, event: Message) {
-        println!("--- update {:?}", event);
+        // println!("--- update {:?}", event);
 
         match event {
             Message::GridEvent(grid_message) => {

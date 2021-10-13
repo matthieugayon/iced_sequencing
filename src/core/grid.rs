@@ -153,6 +153,26 @@ impl GridPattern {
         }
     }
 
+    pub fn add_one_to_selection(&mut self, grid_id: (usize, usize)) {
+        match self.data.get_mut(&grid_id) {
+            Some(grid_event) => { grid_event.selected = true; }
+            None => {}
+        }
+    }
+
+    pub fn add_selected_area(&mut self, selection: Rectangle, size: Size) {
+        self.data
+            .iter_mut()
+            .for_each(|((step, track), grid_event)| {
+                let event_bounds = get_event_bounds(*step, *track, grid_event.offset, size);
+
+                match selection.intersection(&event_bounds) {
+                    Some(_) => { grid_event.selected = true; }
+                    None => {}
+                }
+            });
+    }
+
     pub fn select_all(&mut self) {
         self.data.iter_mut().for_each(|(_, grid)| {
             grid.selected = true;
@@ -161,11 +181,7 @@ impl GridPattern {
 
     pub fn select_one(&mut self, grid_id: (usize, usize)) {
         self.data.iter_mut().for_each(|((step, track), grid)| {
-            if *step == grid_id.0 && *track == grid_id.1 {
-                grid.selected = true;
-            } else {
-                grid.selected = false;
-            }
+            grid.selected = *step == grid_id.0 && *track == grid_id.1;
         });
     }
 
@@ -346,8 +362,8 @@ impl GridPattern {
             // we are dragging to the right
             // offset is <= 0.5
             // nothing on the step to be dragged on, nothing on the next one either
-            (drag_right, offset, None, None) 
-                if drag_right && offset <= 0.5 => {
+            (drag_right, offset, None, None)
+            if drag_right && offset <= 0.5 => {
                 output.insert(
                     (step, track),
                     GridEvent {
@@ -357,8 +373,8 @@ impl GridPattern {
                     },
                 );
             }
-            (drag_right, offset, None, None) 
-                if drag_right && offset > 0.5 => {
+            (drag_right, offset, None, None)
+            if drag_right && offset > 0.5 => {
                 output.insert(
                     ((step + 1) % NUM_STEPS, track),
                     GridEvent {
@@ -371,66 +387,66 @@ impl GridPattern {
             // we are dragging to the right
             // something on the step to be dragged on, nothing on the next one
             (drag_right, offset, Some(found_event), None)
-                if drag_right && offset > found_event.offset && offset >= OFFSET_THRESHOLD =>
-            {
-                output.insert(
-                    ((step + 1) % NUM_STEPS, track),
-                    GridEvent {
-                        offset: offset - 1.,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if drag_right && offset > found_event.offset && offset >= OFFSET_THRESHOLD =>
+                {
+                    output.insert(
+                        ((step + 1) % NUM_STEPS, track),
+                        GridEvent {
+                            offset: offset - 1.,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             (drag_right, offset, Some(found_event), None)
-                if drag_right && (offset <= found_event.offset || offset < OFFSET_THRESHOLD) =>
-            {
-                output.remove(&(step, track));
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if drag_right && (offset <= found_event.offset || offset < OFFSET_THRESHOLD) =>
+                {
+                    output.remove(&(step, track));
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             // we are dragging to the right
             // nothing on the step to be dragged on, something on the next one though
             (drag_right, offset, None, Some(found_event))
-                if drag_right
-                    && (found_event.offset >= 0.
-                        || (found_event.offset < 0.
-                            && offset < (1. + found_event.offset - OFFSET_THRESHOLD))) =>
-            {
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if drag_right
+                && (found_event.offset >= 0.
+                || (found_event.offset < 0.
+                && offset < (1. + found_event.offset - OFFSET_THRESHOLD))) =>
+                {
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             (drag_right, offset, None, Some(found_event))
-                if drag_right
-                    && found_event.offset < 0.
-                    && offset >= (1. + found_event.offset - OFFSET_THRESHOLD) =>
-            {
-                output.remove(&((step + 1) % NUM_STEPS, track));
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if drag_right
+                && found_event.offset < 0.
+                && offset >= (1. + found_event.offset - OFFSET_THRESHOLD) =>
+                {
+                    output.remove(&((step + 1) % NUM_STEPS, track));
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             // we are dragging to the left
             // nothing on the step to be dragged on, nothing on the next one either
-            (drag_right, offset, None, None) 
-                if !drag_right && offset > 0.5  => {
+            (drag_right, offset, None, None)
+            if !drag_right && offset > 0.5  => {
                 output.insert(
                     ((step + 1) % NUM_STEPS, track),
                     GridEvent {
@@ -440,8 +456,8 @@ impl GridPattern {
                     },
                 );
             }
-            (drag_right, offset, None, None) 
-                if !drag_right && offset <= 0.5  => {
+            (drag_right, offset, None, None)
+            if !drag_right && offset <= 0.5  => {
                 output.insert(
                     (step, track),
                     GridEvent {
@@ -454,94 +470,94 @@ impl GridPattern {
             // we are dragging to the left
             // something on the step to be dragged on, nothing on the next one
             (drag_right, offset, Some(found_event), None)
-                if !drag_right
-                    && offset > (found_event.offset + OFFSET_THRESHOLD)
-                    && offset > OFFSET_THRESHOLD =>
-            {
-                output.insert(
-                    ((step + 1) % NUM_STEPS, track),
-                    GridEvent {
-                        offset: offset - 1.,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if !drag_right
+                && offset > (found_event.offset + OFFSET_THRESHOLD)
+                && offset > OFFSET_THRESHOLD =>
+                {
+                    output.insert(
+                        ((step + 1) % NUM_STEPS, track),
+                        GridEvent {
+                            offset: offset - 1.,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             (drag_right, offset, Some(found_event), None)
-                if !drag_right
-                    && (offset <= (found_event.offset + OFFSET_THRESHOLD)
-                        || offset <= OFFSET_THRESHOLD) =>
-            {
-                output.remove(&(step, track));
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if !drag_right
+                && (offset <= (found_event.offset + OFFSET_THRESHOLD)
+                || offset <= OFFSET_THRESHOLD) =>
+                {
+                    output.remove(&(step, track));
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             // we are dragging to the left
             // nothing on the step to be dragged on, something on the next one
             (drag_right, offset, None, Some(found_event))
-                if !drag_right
-                    && (found_event.offset >= 0.
-                        || (found_event.offset < 0.
-                            && offset < (1. + event.offset - OFFSET_THRESHOLD))) =>
-            {
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if !drag_right
+                && (found_event.offset >= 0.
+                || (found_event.offset < 0.
+                && offset < (1. + event.offset - OFFSET_THRESHOLD))) =>
+                {
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             (drag_right, offset, None, Some(found_event))
-                if !drag_right
-                    && found_event.offset < 0.
-                    && offset >= (1. + event.offset - OFFSET_THRESHOLD) =>
-            {
-                output.remove(&((step + 1) % NUM_STEPS, track));
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if !drag_right
+                && found_event.offset < 0.
+                && offset >= (1. + event.offset - OFFSET_THRESHOLD) =>
+                {
+                    output.remove(&((step + 1) % NUM_STEPS, track));
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             // we are dragging
             // something on the step to be dragged on, something on the next one also
             (_, offset, Some(found_event), Some(_))
-                if offset <= found_event.offset - OFFSET_THRESHOLD =>
-            {
-                output.remove(&(step, track));
-                output.insert(
-                    (step, track),
-                    GridEvent {
-                        offset,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if offset <= found_event.offset - OFFSET_THRESHOLD =>
+                {
+                    output.remove(&(step, track));
+                    output.insert(
+                        (step, track),
+                        GridEvent {
+                            offset,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             (_, offset, Some(found_event), Some(_))
-                if offset > found_event.offset - OFFSET_THRESHOLD =>
-            {
-                output.remove(&((step + 1) % NUM_STEPS, track));
-                output.insert(
-                    ((step + 1) % NUM_STEPS, track),
-                    GridEvent {
-                        offset: offset - 1.,
-                        velocity: event.velocity,
-                        selected: true,
-                    },
-                );
-            }
+            if offset > found_event.offset - OFFSET_THRESHOLD =>
+                {
+                    output.remove(&((step + 1) % NUM_STEPS, track));
+                    output.insert(
+                        ((step + 1) % NUM_STEPS, track),
+                        GridEvent {
+                            offset: offset - 1.,
+                            velocity: event.velocity,
+                            selected: true,
+                        },
+                    );
+                }
             _ => {
                 println!("case not covered {:?}", cases);
             }
@@ -612,8 +628,10 @@ pub enum GridMessage {
     Add((usize, usize, f32)), // empty selection, add event, select event => COMMITS STATE
     Delete((usize, usize)), // delete selection
     ToggleOne((usize, usize)), // just mutate selection
+    AddOneToSelection((usize, usize)), // Add one to the selection
+    AddSelectedArea(Rectangle, Size), // Add events from area to the selection
     SelectOne((usize, usize)), // empty selection, select new one
-    SelectArea(Rectangle, Size), // empty selection, select new one
+    SelectArea(Rectangle, Size), // empty selection, select events from area
     SelectAll(),
     EmptySelection(),
     ToggleArea(Rectangle, Size),
@@ -627,8 +645,8 @@ pub enum GridMessage {
 
 
 pub fn manage_state_update(
-    message: GridMessage, 
-    state: &mut State, 
+    message: GridMessage,
+    state: &mut State,
     live_pattern: &mut GridPattern,
     focused_track: &mut usize
 ) {
@@ -657,6 +675,16 @@ pub fn manage_state_update(
             live_pattern.data = next_grid.data.clone();
             state.set_pattern(next_grid);
         },
+        GridMessage::AddOneToSelection(grid_id) => {
+            next_grid.add_one_to_selection(grid_id);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
+        GridMessage::AddSelectedArea(selection, bounds) => {
+            next_grid.add_selected_area(selection, bounds);
+            live_pattern.data = next_grid.data.clone();
+            state.set_pattern(next_grid);
+        },
         GridMessage::SelectOne(grid_id) => {
             next_grid.select_one(grid_id);
             live_pattern.data = next_grid.data.clone();
@@ -679,7 +707,7 @@ pub fn manage_state_update(
         },
         GridMessage::MoveSelection(next_movement, relative) => {
             state.set_movement(next_movement, relative);
-            
+
             match state.get_movement() {
                 Some(movement) => {
                     next_grid.move_selection(movement.0, movement.1);

@@ -2,7 +2,7 @@ use super::Idle;
 use super::LogoCtrl;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
-    get_hovered_track, get_hovered_step, get_step_width, 
+    get_hovered_track, get_hovered_step, get_step_width,
     GridMessage, GridPattern
 };
 use iced_native::{keyboard, Point, Rectangle, mouse};
@@ -160,8 +160,6 @@ impl WidgetState for Waiting {
             },
             // otherwise add event
             None => {
-                grid_messages.push(GridMessage::EmptySelection());
-
                 let step_width = get_step_width(bounds.size());
                 let interactive_area = Rectangle {
                     x: bounds.x + step_width,
@@ -190,22 +188,20 @@ impl WidgetState for Waiting {
         let mut grid_messages = vec![
             GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
         ];
-        
+
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
+            // if yes toggle selection of this specific event
             Some(((step, track), _)) => {
                 grid_messages.push(GridMessage::ToggleOne((*step, *track)));
+
                 (Transition::DoNothing, Some(grid_messages))
             },
-            // otherwise add event
-            None => {
-                grid_messages.push(GridMessage::EmptySelection());
-
-                (
-                    Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
-                    Some(grid_messages),
-                )
-            },
+            // otherwise change to area selection mode
+            None => (
+                Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
+                Some(grid_messages),
+            ),
         }
     }
 
@@ -236,9 +232,7 @@ struct Selecting {
 }
 
 impl Selecting {
-    fn from_args(point: Point) -> Self {
-        Selecting { origin: point }
-    }
+    fn from_args(point: Point) -> Self { Selecting { origin: point } }
 }
 
 impl WidgetState for Selecting {
@@ -277,7 +271,7 @@ impl WidgetState for Selecting {
 
         (
             Transition::DoNothing,
-            Some(vec![GridMessage::SelectArea(selection, bounds.size())]),
+            Some(vec![GridMessage::AddSelectedArea(selection, bounds.size())]),
         )
     }
 

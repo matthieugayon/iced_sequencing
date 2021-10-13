@@ -1,9 +1,11 @@
-use super::{Idle, Transition, WidgetContext, WidgetState};
+use iced_native::{keyboard, mouse, Point, Rectangle};
+
 use crate::core::grid::{
-    get_hovered_track, get_hovered_step, get_step_width, 
+    get_hovered_step, get_hovered_track, get_step_width,
     GridMessage, GridPattern
 };
-use iced_native::{keyboard, mouse, Point, Rectangle};
+
+use super::{Idle, Transition, WidgetContext, WidgetState};
 
 #[derive(Debug)]
 pub struct LogoCtrl {
@@ -118,11 +120,6 @@ impl WidgetState for LogoCtrl {
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState + Send>) {
-        // println!("Idle: changing sub state {:?} => {:?}",
-        //     self.nested,
-        //     next_state
-        // );
-
         self.nested = next_state;
     }
 }
@@ -194,16 +191,13 @@ impl WidgetState for Waiting {
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let mut grid_messages = vec![
             GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
-            GridMessage::EmptySelection()
         ];
 
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
-            // if yes select event
-            Some(((step, track), grid_event)) => {
-                if !grid_event.selected {
-                    grid_messages.push(GridMessage::SelectOne((*step, *track)));
-                }
+            // if yes add event to selection and change the velocity of selected events
+            Some(((step, track), _)) => {
+                grid_messages.push(GridMessage::AddOneToSelection((*step, *track)));
 
                 (
                     Transition::ChangeState(Box::new(SetVelocity::from_args(cursor))),
@@ -213,7 +207,7 @@ impl WidgetState for Waiting {
             // otherwise change to area selection mode
             None => (
                 Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
-                None,
+                Some(grid_messages),
             ),
         }
     }
@@ -278,9 +272,7 @@ struct Selecting {
 }
 
 impl Selecting {
-    fn from_args(point: Point) -> Self {
-        Selecting { origin: point }
-    }
+    fn from_args(point: Point) -> Self { Selecting { origin: point } }
 }
 
 impl WidgetState for Selecting {
