@@ -154,9 +154,8 @@ impl GridPattern {
     }
 
     pub fn add_one_to_selection(&mut self, grid_id: (usize, usize)) {
-        match self.data.get_mut(&grid_id) {
-            Some(grid_event) => { grid_event.selected = true; }
-            None => {}
+        if let Some(grid_event) = self.data.get_mut(&grid_id) {
+            grid_event.selected = true;
         }
     }
 
@@ -165,11 +164,7 @@ impl GridPattern {
             .iter_mut()
             .for_each(|((step, track), grid_event)| {
                 let event_bounds = get_event_bounds(*step, *track, grid_event.offset, size);
-
-                match selection.intersection(&event_bounds) {
-                    Some(_) => { grid_event.selected = true; }
-                    None => {}
-                }
+                if selection.intersection(&event_bounds).is_some() { grid_event.selected = true; }
             });
     }
 
