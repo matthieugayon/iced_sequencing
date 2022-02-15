@@ -594,6 +594,7 @@ impl From<GridPattern> for Pattern {
         for ((step, track), event) in grid.data {
             pattern.data[step][(NUM_PERCS - 1) - track][0] = event.velocity;
             pattern.data[step][(NUM_PERCS - 1) - track][1] = event.offset;
+            pattern.data[step][(NUM_PERCS - 1) - track][2] = 1.0 / NUM_STEPS as f32;
         }
 
         pattern
