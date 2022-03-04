@@ -110,7 +110,8 @@ impl WidgetState for Idle {
         key_code: keyboard::KeyCode,
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_key_pressed(key_code, context);
+        let (next_transition, messages) =
+            self.nested.on_key_pressed(key_code, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -182,10 +183,7 @@ impl WidgetState for Waiting {
             }
         }
 
-        (
-            Transition::DoNothing,
-            Some(grid_messages),
-        )
+        (Transition::DoNothing, Some(grid_messages))
     }
 
     fn on_click(
@@ -196,15 +194,17 @@ impl WidgetState for Waiting {
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let mut grid_messages = vec![
-            GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
-            GridMessage::EmptySelection()
+            GridMessage::TrackSelected(get_hovered_track(cursor, bounds))
         ];
 
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
             // if yes select only this event and start grabbing
             Some(((step, track), grid_event)) => {
-                grid_messages.push(GridMessage::SelectOne((*step, *track)));
+                if !grid_event.selected {
+                    grid_messages.push(GridMessage::EmptySelection());
+                    grid_messages.push(GridMessage::SelectOne((*step, *track)));
+                }
 
                 context.mouse_interaction = mouse::Interaction::Grab;
 
@@ -217,10 +217,14 @@ impl WidgetState for Waiting {
                 )
             }
             // otherwise change to area selection mode
-            None => (
-                Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
-                Some(grid_messages),
-            )
+            None => {
+                grid_messages.push(GridMessage::EmptySelection());
+
+                (
+                    Transition::ChangeState(Box::new(Selecting::from_args(cursor))),
+                    Some(grid_messages),
+                )
+            }
         }
     }
 
