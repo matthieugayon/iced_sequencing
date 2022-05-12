@@ -2,7 +2,7 @@ use super::LogoCtrl;
 use super::Shift;
 use super::{Transition, WidgetContext, WidgetState};
 use crate::core::grid::{
-    get_hovered_step, get_hovered_track, get_step_width, 
+    get_hovered_step, get_hovered_track, get_step_width,
     GridEvent, GridMessage, GridPattern
 };
 use iced_native::{keyboard, mouse, Point, Rectangle};
@@ -110,7 +110,8 @@ impl WidgetState for Idle {
         key_code: keyboard::KeyCode,
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        let (next_transition, messages) = self.nested.on_key_pressed(key_code, context);
+        let (next_transition, messages) =
+            self.nested.on_key_pressed(key_code, context);
 
         if let Transition::ChangeState(new_state) = next_transition {
             self.next(new_state);
@@ -120,11 +121,6 @@ impl WidgetState for Idle {
     }
 
     fn next(&mut self, next_state: Box<dyn WidgetState + Send>) {
-        // println!("Idle: changing sub state {:?} => {:?}",
-        //     self.nested,
-        //     next_state
-        // );
-
         self.nested = next_state;
     }
 }
@@ -187,10 +183,7 @@ impl WidgetState for Waiting {
             }
         }
 
-        (
-            Transition::DoNothing,
-            Some(grid_messages),
-        )
+        (Transition::DoNothing, Some(grid_messages))
     }
 
     fn on_click(
@@ -201,17 +194,16 @@ impl WidgetState for Waiting {
         context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let mut grid_messages = vec![
-            GridMessage::TrackSelected(get_hovered_track(cursor, bounds)),
+            GridMessage::TrackSelected(get_hovered_track(cursor, bounds))
         ];
 
         // check if we hover an event on the grid
         match base_pattern.get_hovered(cursor, bounds) {
-            // if yes remove event
+            // if yes select only this event and start grabbing
             Some(((step, track), grid_event)) => {
                 if !grid_event.selected {
-                    println!("event not selected");
                     grid_messages.push(GridMessage::EmptySelection());
-                    grid_messages.push(GridMessage::SelectOne((*step, *track)))
+                    grid_messages.push(GridMessage::SelectOne((*step, *track)));
                 }
 
                 context.mouse_interaction = mouse::Interaction::Grab;
@@ -224,7 +216,7 @@ impl WidgetState for Waiting {
                     Some(grid_messages),
                 )
             }
-            // otherwise add event
+            // otherwise change to area selection mode
             None => {
                 grid_messages.push(GridMessage::EmptySelection());
 
@@ -281,9 +273,7 @@ struct Selecting {
 }
 
 impl Selecting {
-    fn from_args(point: Point) -> Self {
-        Selecting { origin: point }
-    }
+    fn from_args(point: Point) -> Self { Selecting { origin: point } }
 }
 
 impl WidgetState for Selecting {
