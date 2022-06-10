@@ -1,90 +1,90 @@
-use super::super::h_list;
 use super::title_bar::TitleBar;
 use iced_native::{
-    container, event, layout, overlay, Clipboard, Element, Event, Hasher, Layout, Point, Rectangle,
-    Size,
+    event, layout, overlay, Clipboard, Element,
+    Event, Layout, Point, Rectangle,
+    Size, widget::container, Shell, mouse
 };
 
-/// The content of a [`Pane`].
-///
-/// [`Pane`]: crate::widget::pane_grid::Pane
-#[allow(missing_debug_implementations)]
-pub struct Content<'a, Message, Renderer: h_list::Renderer> {
+pub struct Content<'a, Message, Renderer> {
     title_bar: Option<TitleBar<'a, Message, Renderer>>,
     body: Element<'a, Message, Renderer>,
-    style: <Renderer as container::Renderer>::Style,
+    style_sheet: Box<dyn container::StyleSheet + 'a>,
 }
+
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
 where
-    Renderer: h_list::Renderer,
+    Renderer: iced_native::Renderer,
 {
-    /// Creates a new [`Content`] with the provided body.
     pub fn new(body: impl Into<Element<'a, Message, Renderer>>) -> Self {
         Self {
             title_bar: None,
             body: body.into(),
-            style: Default::default(),
+            style_sheet: Default::default(),
         }
     }
 
-    /// Sets the [`TitleBar`] of this [`Content`].
     pub fn title_bar(mut self, title_bar: TitleBar<'a, Message, Renderer>) -> Self {
         self.title_bar = Some(title_bar);
         self
     }
 
     /// Sets the style of the [`Content`].
-    pub fn style(mut self, style: impl Into<<Renderer as container::Renderer>::Style>) -> Self {
-        self.style = style.into();
+    pub fn style(mut self, style_sheet: impl Into<Box<dyn container::StyleSheet + 'a>>,
+    ) -> Self {
+        self.style_sheet = style_sheet.into();
         self
     }
 }
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
 where
-    Renderer: h_list::Renderer,
+    Renderer: iced_native::Renderer,
 {
-    /// Draws the [`Content`] with the provided [`Renderer`] and [`Layout`].
-    ///
-    /// [`Renderer`]: crate::widget::pane_grid::Renderer
     pub fn draw(
         &self,
         renderer: &mut Renderer,
-        defaults: &Renderer::Defaults,
+        style: &iced_native::renderer::Style,
         layout: Layout<'_>,
         cursor_position: Point,
         viewport: &Rectangle,
-    ) -> Renderer::Output {
+    ) {
+        let bounds = layout.bounds();
+
+        {
+            let style = self.style_sheet.style();
+            container::draw_background(renderer, &style, bounds);
+        }
+
         if let Some(title_bar) = &self.title_bar {
             let mut children = layout.children();
             let title_bar_layout = children.next().unwrap();
             let body_layout = children.next().unwrap();
 
-            renderer.draw_pane(
-                defaults,
-                layout.bounds(),
-                &self.style,
-                Some((title_bar, title_bar_layout)),
-                (&self.body, body_layout),
+            let show_controls = bounds.contains(cursor_position);
+
+            title_bar.draw(
+                renderer,
+                style,
+                title_bar_layout,
                 cursor_position,
                 viewport,
-            )
+                show_controls,
+            );
+
+            self.body.draw(
+                renderer,
+                style,
+                body_layout,
+                cursor_position,
+                viewport,
+            );
         } else {
-            renderer.draw_pane(
-                defaults,
-                layout.bounds(),
-                &self.style,
-                None,
-                (&self.body, layout),
-                cursor_position,
-                viewport,
-            )
+            self.body
+                .draw(renderer, style, layout, cursor_position, viewport);
         }
     }
 
-    /// Returns whether the [`Content`] with the given [`Layout`] can be picked
-    /// at the provided cursor position.
     pub fn can_be_picked_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
         // if let Some(title_bar) = &self.title_bar {
         //     let mut children = layout.children();
@@ -102,8 +102,8 @@ where
         if let Some(title_bar) = &self.title_bar {
             let max_size = limits.max();
 
-            let title_bar_layout =
-                title_bar.layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+            let title_bar_layout = title_bar
+                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
 
             let title_bar_size = title_bar_layout.size();
 
@@ -111,13 +111,13 @@ where
                 renderer,
                 &layout::Limits::new(
                     Size::ZERO,
-                    Size::new(max_size.width, max_size.height - title_bar_size.height),
+                    Size::new(max_size.width,max_size.height - title_bar_size.height),
                 ),
             );
 
             body_layout.move_to(Point::new(0.0, title_bar_size.height));
 
-            layout::Node::with_children(max_size, vec![title_bar_layout, body_layout])
+            layout::Node::with_children(max_size,vec![title_bar_layout, body_layout])
         } else {
             self.body.layout(renderer, limits)
         }
@@ -130,7 +130,7 @@ where
         cursor_position: Point,
         renderer: &Renderer,
         clipboard: &mut dyn Clipboard,
-        messages: &mut Vec<Message>,
+        shell: &mut Shell<'_, Message>,
         is_picked: bool,
     ) -> event::Status {
         let mut event_status = event::Status::Ignored;
@@ -144,7 +144,7 @@ where
                 cursor_position,
                 renderer,
                 clipboard,
-                messages,
+                shell,
             );
 
             children.next().unwrap()
@@ -161,35 +161,64 @@ where
                 cursor_position,
                 renderer,
                 clipboard,
-                messages,
+                shell,
             )
         };
 
         event_status.merge(body_status)
     }
 
-    pub(crate) fn hash_layout(&self, state: &mut Hasher) {
-        if let Some(title_bar) = &self.title_bar {
-            title_bar.hash_layout(state);
-        }
+    pub(crate) fn mouse_interaction(
+        &self,
+        layout: Layout<'_>,
+        cursor_position: Point,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        let (body_layout, title_bar_interaction) =
+            if let Some(title_bar) = &self.title_bar {
+                let mut children = layout.children();
+                let title_bar_layout = children.next().unwrap();
 
-        self.body.hash_layout(state);
+                let is_over_pick_area = title_bar
+                    .is_over_pick_area(title_bar_layout, cursor_position);
+
+                if is_over_pick_area {
+                    return mouse::Interaction::Grab;
+                }
+
+                let mouse_interaction = title_bar.mouse_interaction(
+                    title_bar_layout,
+                    cursor_position,
+                    viewport,
+                    renderer,
+                );
+
+                (children.next().unwrap(), mouse_interaction)
+            } else {
+                (layout, mouse::Interaction::default())
+            };
+
+        self.body
+            .mouse_interaction(body_layout, cursor_position, viewport, renderer)
+            .max(title_bar_interaction)
     }
 
     pub(crate) fn overlay(
         &mut self,
         layout: Layout<'_>,
+        renderer: &Renderer,
     ) -> Option<overlay::Element<'_, Message, Renderer>> {
         if let Some(title_bar) = self.title_bar.as_mut() {
             let mut children = layout.children();
             let title_bar_layout = children.next()?;
 
-            match title_bar.overlay(title_bar_layout) {
+            match title_bar.overlay(title_bar_layout, renderer) {
                 Some(overlay) => Some(overlay),
-                None => self.body.overlay(children.next()?),
+                None => self.body.overlay(children.next()?, renderer),
             }
         } else {
-            self.body.overlay(layout)
+            self.body.overlay(layout, renderer)
         }
     }
 }
@@ -197,7 +226,7 @@ where
 impl<'a, T, Message, Renderer> From<T> for Content<'a, Message, Renderer>
 where
     T: Into<Element<'a, Message, Renderer>>,
-    Renderer: h_list::Renderer + container::Renderer,
+    Renderer: iced_native::Renderer
 {
     fn from(element: T) -> Self {
         Self::new(element)

@@ -9,7 +9,7 @@ use iced::{
 
 use iced_sequencing::grid::{self, GridColor};
 use iced_sequencing::style::grid::{
-    Style, StyleSheet, 
+    Style, StyleSheet,
     Grid, Event, Stroke
 };
 use iced_sequencing::style::color_utils::*;

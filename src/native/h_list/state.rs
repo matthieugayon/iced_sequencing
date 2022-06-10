@@ -3,7 +3,7 @@ use iced_native::Point;
 #[derive(Debug, Clone)]
 pub struct State<T> {
     pub(super) panes: Vec<T>,
-    pub(super) internal: Internal,
+    pub(super) action: Action
 }
 
 impl<T> State<T>
@@ -13,9 +13,7 @@ where
     pub fn new(panes: Vec<T>) -> Self {
         Self {
             panes: panes.clone(),
-            internal: Internal {
-                action: Action::Idle,
-            },
+            action: Action::Idle
         }
     }
 
@@ -55,11 +53,6 @@ where
         self.panes.remove(index);
     }
 }
-#[derive(Debug, Clone)]
-pub struct Internal {
-    // last_id: usize,
-    action: Action,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Action {
@@ -67,22 +60,12 @@ pub enum Action {
     Dragging { index: usize, origin: Point },
 }
 
-impl Internal {
+impl Action {
+    /// Returns the current [`Pane`] that is being dragged, if any.
     pub fn picked_pane(&self) -> Option<(usize, Point)> {
-        match self.action {
-            Action::Dragging { index, origin, .. } => Some((index, origin)),
+        match *self {
+            Action::Dragging { pane, origin, .. } => Some((pane, origin)),
             _ => None,
         }
-    }
-
-    pub fn pick_pane(&mut self, pick_index: &usize, origin: Point) {
-        self.action = Action::Dragging {
-            index: *pick_index,
-            origin,
-        };
-    }
-
-    pub fn idle(&mut self) {
-        self.action = Action::Idle;
     }
 }

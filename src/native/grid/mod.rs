@@ -1,20 +1,16 @@
 use std::fmt::Debug;
-
 use iced_native::{
-    event, keyboard, layout, mouse, Clipboard, Element, Event, Hasher, Layout, Length, Padding,
+    event, keyboard, layout, mouse, Clipboard,
+    Element, Event, Layout, Length, Padding,
     Point, Rectangle, Size, Widget,
 };
-
 use iced_graphics::canvas;
 
-use std::hash::Hash;
-
 use ganic_no_std::NUM_PERCS;
-
 use crate::core::grid::{GridMessage, GridPattern};
+pub use crate::style::multi_slider::{Style, StyleSheet};
 
 pub mod modes;
-
 use modes::{Idle, Transition, WidgetState};
 
 pub struct Grid<'a, Message, Renderer: self::Renderer> {
@@ -368,11 +364,11 @@ where
     fn draw(
         &self,
         renderer: &mut Renderer,
-        _defaults: &Renderer::Defaults,
+        _style: &iced_native::renderer::Style,
         layout: Layout<'_>,
         cursor_position: Point,
         _viewport: &Rectangle,
-    ) -> Renderer::Output {
+    ) {
         renderer.draw(
             layout.bounds(),
             layout.children().next().unwrap().bounds(),
@@ -387,14 +383,6 @@ where
             &self.state.event_cache,
             &self.state.highlight_cache,
         )
-    }
-
-    fn hash_layout(&self, state: &mut Hasher) {
-        struct Marker;
-        std::any::TypeId::of::<Marker>().hash(state);
-
-        self.width.hash(state);
-        self.height.hash(state);
     }
 }
 pub trait Renderer: iced_native::Renderer {
@@ -415,7 +403,7 @@ pub trait Renderer: iced_native::Renderer {
         grid_cache: &canvas::Cache,
         event_cache: &canvas::Cache,
         highlight_cache: &canvas::Cache,
-    ) -> Self::Output;
+    );
 }
 
 impl<'a, Message, Renderer> From<Grid<'a, Message, Renderer>> for Element<'a, Message, Renderer>

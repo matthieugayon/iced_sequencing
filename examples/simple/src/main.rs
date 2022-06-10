@@ -1,7 +1,7 @@
 // Import iced modules.
 use iced::{
     Button, Color, Column, Container,
-    Element, Length, Sandbox, Settings, Text, button, 
+    Element, Length, Sandbox, Settings, Text, button,
     container, Alignment
 };
 

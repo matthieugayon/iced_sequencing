@@ -4,10 +4,10 @@ use iced_graphics::{Backend, Primitive, Renderer};
 use iced_native::Background;
 
 use crate::core::grid::{
-    get_event_bounds, get_step_dimensions, 
+    get_event_bounds, get_step_dimensions,
     GridPattern, TRACK_MARGIN_BOTTOM
 };
-use iced_native::{mouse, Point, Rectangle, Size, Vector};
+use iced_native::{Point, Rectangle, Size, Vector};
 
 pub use crate::native::grid::State;
 pub use crate::style::color_utils::{darken, lighten};
@@ -30,14 +30,13 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         _cursor_position: Point,
         grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
-        mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
         style_sheet: &Self::Style,
         grid_cache: &Cache,
         event_cache: &Cache,
         _highlight_cache: &Cache,
-    ) -> Self::Output {
+    ) {
         let style = style_sheet.default();
         let step_size = get_step_dimensions(drawable_area.size());
 
@@ -100,10 +99,12 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
             });
         }
 
-        (
-            Primitive::Group { primitives },
-            mouse_interaction,
-        )
+        // (
+        //     Primitive::Group { primitives },
+        //     mouse_interaction,
+        // )
+
+        self.draw_primitive(Primitive::Group { primitives })
     }
 }
 
@@ -161,7 +162,7 @@ fn draw_grid(
         frame.fill(&beat_bg, bg_color);
     }
 
-    // edges bg 
+    // edges bg
     let start_edge = Point { x: 0., y: 0. };
     let start_edge_size = Size { width: step_size.width, height: size.height };
     let start_bg = Path::rectangle(start_edge, start_edge_size);
@@ -171,7 +172,7 @@ fn draw_grid(
     let end_edge_size = Size { width: step_size.width, height: size.height };
     let end_bg = Path::rectangle(end_edge, end_edge_size);
     frame.fill(&end_bg, style.grid.edge_step_bg_color);
-    
+
     // track margins
     for track in 0..NUM_PERCS {
         let track_margin_origin = Point {
@@ -228,7 +229,7 @@ fn draw_highlight(
     style: &Style,
 ) -> Primitive {
     let mut frame = Frame::new(size);
-    
+
     let highlighted_steps = Path::new(|path| {
         for (track , highlighted_step) in highlight.iter().enumerate() {
             let event_bounds = get_event_bounds(*highlighted_step, track, 0., size);
@@ -307,7 +308,7 @@ fn draw_steps(
                 step_size,
             );
             frame.fill(&selected_countour, style.event.contour_bg_color);
-            
+
             // event with fill & stroke
             let event = Path::rectangle(
                 Point {

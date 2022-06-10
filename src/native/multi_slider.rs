@@ -1,11 +1,13 @@
 use iced_native::{
-    event, layout, mouse, touch, Clipboard, Color, Element, Event, Hasher, Layout, Length, Padding,
-    Point, Rectangle, Size, Widget,
+    event, layout, mouse, touch, Clipboard, Color,
+    Element, Event, Layout, Length, Padding, Shell,
+    Point, Rectangle, Size, Widget, renderer,Background
 };
-use std::{hash::Hash, ops::RangeInclusive};
+use std::ops::RangeInclusive;
+pub use crate::style::multi_slider::{Style, StyleSheet};
 
 #[allow(missing_debug_implementations)]
-pub struct MultiSlider<'a, T, Message, Renderer: self::Renderer> {
+pub struct MultiSlider<'a, T, Message> {
     state: &'a mut State,
     values: Vec<T>,
     range: RangeInclusive<T>,
@@ -18,14 +20,13 @@ pub struct MultiSlider<'a, T, Message, Renderer: self::Renderer> {
     spacing: u16,
     padding: Padding,
     base_color: Color,
-    style: Renderer::Style,
+    style_sheet: Box<dyn StyleSheet + 'a>,
 }
 
-impl<'a, T, Message, Renderer> MultiSlider<'a, T, Message, Renderer>
+impl<'a, T, Message> MultiSlider<'a, T, Message>
 where
     T: Copy + From<u8> + std::cmp::PartialOrd,
-    Message: Clone,
-    Renderer: self::Renderer,
+    Message: Clone
 {
     pub fn new<F>(
         state: &'a mut State,
@@ -63,7 +64,7 @@ where
             spacing: 0,
             padding: Padding::ZERO,
             base_color,
-            style: Renderer::Style::default(),
+            style_sheet: Default::default(),
         }
     }
 
@@ -92,18 +93,8 @@ where
         self
     }
 
-    // pub fn number_of_sliders(mut self, number_of_sliders: u16) -> Self {
-    //     // match let sliders = self.state.values.len() {
-    //     //     number_of_sliders > sliders {
-
-    //     //     }
-    //     // }
-    //     // self.number_of_sliders = number_of_sliders;
-    //     self
-    // }
-
-    pub fn style(mut self, style: impl Into<Renderer::Style>) -> Self {
-        self.style = style.into();
+    pub fn style(mut self, style: impl Into<Box<dyn StyleSheet + 'a>>) -> Self {
+        self.style_sheet = style.into();
         self
     }
 
@@ -116,6 +107,98 @@ where
         self.active = active;
         self
     }
+}
+
+pub fn draw<T, Renderer>(
+    renderer: &mut Renderer,
+    layout: Layout<'_>,
+    cursor_position: Point,
+    values: Vec<T>,
+    range: &RangeInclusive<T>,
+    style_sheet: &dyn StyleSheet,
+    base_color: Color,
+    spacing: u16,
+    active: Option<usize>
+) where
+    T: Into<f64> + Copy,
+    Renderer: iced_native::Renderer,
+{
+    let style = style_sheet.default(base_color);
+    let highlight_slider_style = style_sheet.highlight(base_color);
+    let hovered_slider_style = style_sheet.hovered(base_color);
+    let bounds = layout.bounds();
+    let slider_width = bounds.width / values.len() as f32;
+    let (range_start, range_end) = range.into_inner();
+
+    let mut primitives = vec![];
+
+    if style.background.is_some() || style.border_width > 0.0 {
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds,
+                border_radius: style.border_radius,
+                border_width: style.border_width,
+                border_color: style.border_color,
+            },
+            style
+                .background
+                .unwrap_or(Background::Color(Color::TRANSPARENT)),
+        );
+    }
+
+    values.iter()
+        .enumerate()
+        .for_each(|(index, value)| {
+            let ranged_value = if range_start >= range_end {
+                0.0
+            } else {
+                (value - range_start) / (range_end - range_start)
+            };
+            let slider_height = bounds.height * ranged_value;
+
+            let slider_range_bounds = Rectangle {
+                x: bounds.x + index as f32 * slider_width,
+                y: bounds.y,
+                width: slider_width,
+                height: bounds.height,
+            };
+            let slider_bounds = Rectangle {
+                x: (bounds.x + index as f32 * slider_width + spacing as f32)
+                    .round(),
+                y: bounds.y + bounds.height - slider_height,
+                width: (slider_width - 2. * spacing as f32).round(),
+                height: slider_height,
+            };
+
+            let slider_style = match active {
+                Some(active_slider) => {
+                    if slider_range_bounds.contains(cursor_position) {
+                        hovered_slider_style
+                    } else if active_slider == index {
+                        highlight_slider_style
+                    } else {
+                        style.slider
+                    }
+                }
+                None => {
+                    if slider_range_bounds.contains(cursor_position) {
+                        hovered_slider_style
+                    } else {
+                        style.slider
+                    }
+                }
+            };
+
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: slider_bounds,
+                    border_radius: 0.0,
+                    border_width: 0.0,
+                    border_color: Color::TRANSPARENT,
+                },
+                Background::Color(slider_style.color)
+            );
+        });
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -137,11 +220,11 @@ impl State {
     }
 }
 
-impl<'a, T, Message, Renderer> Widget<Message, Renderer> for MultiSlider<'a, T, Message, Renderer>
+impl<'a, T, Message, Renderer> Widget<Message, Renderer> for MultiSlider<'a, T, Message>
 where
     T: Copy + Into<f64> + num_traits::FromPrimitive + std::fmt::Debug,
     Message: Clone,
-    Renderer: self::Renderer,
+    Renderer: iced_native::Renderer,
 {
     fn width(&self) -> Length {
         Length::Shrink
@@ -152,20 +235,9 @@ where
     }
 
     fn layout(&self, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        let limits = limits
-            .width(Length::from(self.width))
-            .height(Length::from(self.height))
-            .pad(self.padding);
-
-        let mut content = layout::Node::new(limits.resolve(Size::ZERO));
-        content.move_to(Point::new(
-            self.padding.left.into(),
-            self.padding.top.into(),
-        ));
-
-        let size = limits.resolve(content.size()).pad(self.padding);
-
-        layout::Node::with_children(size, vec![content])
+        let limits = limits.width(self.width).height(Length::Units(self.height));
+        let size = limits.resolve(Size::ZERO);
+        layout::Node::new(size)
     }
 
     fn on_event(
@@ -175,7 +247,7 @@ where
         cursor_position: Point,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        messages: &mut Vec<Message>,
+        shell: &mut Shell<'_, Message>,
     ) -> event::Status {
         let content_bounds = layout.children().next().unwrap().bounds();
         let slider_width = content_bounds.width / self.values.len() as f32;
@@ -262,7 +334,7 @@ where
                             }
                         }
 
-                        messages.push((self.on_change)(values));
+                        shell.publish((self.on_change)(values));
                     }
                 }
                 None => {
@@ -316,68 +388,52 @@ where
     fn draw(
         &self,
         renderer: &mut Renderer,
-        _defaults: &Renderer::Defaults,
+        _style: &renderer::Style,
         layout: Layout<'_>,
         cursor_position: Point,
         _viewport: &Rectangle,
-    ) -> Renderer::Output {
-        let content_bounds = layout.children().next().unwrap().bounds();
-        let start = *self.range.start();
-        let end = *self.range.end();
-        let values: Vec<f32> = self
-            .values
-            .iter()
-            .map(|&value| value.into() as f32)
-            .collect();
+    ) {
+        // let content_bounds = layout.children().next().unwrap().bounds();
+        // let start = *self.range.start();
+        // let end = *self.range.end();
+        // let values: Vec<f32> = self
+        //     .values
+        //     .iter()
+        //     .map(|&value| value.into() as f32)
+        //     .collect();
 
-        renderer.draw(
-            layout.bounds(),
-            content_bounds,
+        draw(
+            renderer,
+            layout,
             cursor_position,
-            start.into() as f32..=end.into() as f32,
-            values,
-            self.active,
-            self.spacing,
+            self.values,
+            &self.range,
+            self.style_sheet.as_ref(),
             self.base_color,
-            &self.style,
-        )
+            self.spacing,
+            self.active
+        );
     }
 
-    fn hash_layout(&self, state: &mut Hasher) {
-        struct Marker;
-        std::any::TypeId::of::<Marker>().hash(state);
-
-        self.width.hash(state);
-        self.height.hash(state);
-        self.padding.hash(state);
-    }
-}
-
-pub trait Renderer: iced_native::Renderer {
-    type Style: Default;
-
-    fn draw(
-        &mut self,
-        bounds: Rectangle,
-        content_bounds: Rectangle,
+    fn mouse_interaction(
+        &self,
+        layout: Layout<'_>,
         cursor_position: Point,
-        range: RangeInclusive<f32>,
-        values: Vec<f32>,
-        active: Option<usize>,
-        spacing: u16,
-        base_color: Color,
-        style: &Self::Style,
-    ) -> Self::Output;
+        _viewport: &Rectangle,
+        _renderer: &Renderer,
+    ) -> mouse::Interaction {
+        mouse::Interaction::default()
+    }
 }
 
-impl<'a, T, Message, Renderer> From<MultiSlider<'a, T, Message, Renderer>>
+impl<'a, T, Message, Renderer> From<MultiSlider<'a, T, Message>>
     for Element<'a, Message, Renderer>
 where
-    T: 'a + Copy + Into<f64> + num_traits::FromPrimitive + std::fmt::Debug,
+    T: 'a + Copy + Into<f64> + num_traits::FromPrimitive,
     Message: 'a + Clone,
-    Renderer: 'a + self::Renderer,
+    Renderer: 'a + iced_native::Renderer,
 {
-    fn from(multi_slider: MultiSlider<'a, T, Message, Renderer>) -> Element<'a, Message, Renderer> {
+    fn from(multi_slider: MultiSlider<'a, T, Message>) -> Element<'a, Message, Renderer> {
         Element::new(multi_slider)
     }
 }

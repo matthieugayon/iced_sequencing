@@ -1,41 +1,32 @@
-use iced_native::{
-    event, layout, overlay, Clipboard, Element, Event, Hasher, Layout, Length, Padding, Point,
-    Rectangle, Size, Widget,
-};
-
-use ganic_no_std::pattern::Pattern;
-use std::hash::Hash;
-
-use crate::core::grid::GridPattern;
-
+use ganic_no_std::{pattern::Pattern, NUM_STEPS, NUM_PERCS};
+use crate::core::{grid::{GridPattern, GridEvent}, utils::get_step_dimension};
 pub use crate::style::snapshot::{Style, StyleSheet};
 
-pub struct Snapshot<'a, Message, Renderer: self::Renderer> {
+use iced_native::{
+    event, layout, Clipboard,
+    Element, Event, Layout, Length, Padding, Point,
+    Rectangle, Size, Widget, Shell, renderer, Color,
+    Background, mouse
+};
+
+pub struct Snapshot<'a> {
     pattern: GridPattern,
     selected: bool,
     width: Length,
     height: Length,
-    style: Renderer::Style,
-    padding: Padding,
-    controls: Option<Element<'a, Message, Renderer>>,
-    always_show_controls: bool,
+    style_sheet: Box<dyn StyleSheet + 'a>,
+    padding: Padding
 }
 
-impl<'a, Message, Renderer> Snapshot<'a, Message, Renderer>
-where
-    Message: Clone,
-    Renderer: self::Renderer,
-{
+impl<'a> Snapshot<'a> {
     pub fn new(pattern: GridPattern, width: Length, height: Length) -> Self {
         Snapshot {
             pattern,
             selected: false,
             width,
             height,
-            style: Renderer::Style::default(),
-            padding: Padding::ZERO,
-            controls: None,
-            always_show_controls: false,
+            style_sheet: Default::default(),
+            padding: Padding::ZERO
         }
     }
 
@@ -54,8 +45,8 @@ where
         self
     }
 
-    pub fn style(mut self, style: impl Into<Renderer::Style>) -> Self {
-        self.style = style.into();
+    pub fn style(mut self, style: impl Into<Box<dyn StyleSheet + 'a>>) -> Self {
+        self.style_sheet = style.into();
         self
     }
 
@@ -68,22 +59,118 @@ where
         self.selected = select;
         self
     }
-
-    pub fn controls(mut self, controls: impl Into<Element<'a, Message, Renderer>>) -> Self {
-        self.controls = Some(controls.into());
-        self
-    }
-
-    pub fn always_show_controls(mut self) -> Self {
-        self.always_show_controls = true;
-        self
-    }
 }
 
-impl<'a, Message, Renderer> Widget<Message, Renderer> for Snapshot<'a, Message, Renderer>
+pub fn draw<'a, Message, Renderer> (
+    renderer: &mut Renderer,
+    bounds: Rectangle,
+    pattern: GridPattern,
+    selected: bool,
+    style: &dyn StyleSheet,
+    cursor_position: Point,
+    viewport: &Rectangle,
+) where
+    Renderer: iced_native::Renderer,
+{
+    let mut events: Vec<(usize, usize, GridEvent)> = pattern
+        .data
+        .iter()
+        .map(|((step, track), grid_event)| (*step, *track, *grid_event))
+        .collect();
+
+    events.sort_by(|x, y| {
+        if x.1 == y.1 {
+            return x.0.cmp(&y.0);
+        }
+        x.1.cmp(&y.1)
+    });
+
+    let step_bounds = Rectangle {
+        height: bounds.height - 3.,
+        y: bounds.y + 2.,
+        ..bounds
+    };
+    let step_dim: Size = get_step_dimension(step_bounds, NUM_STEPS + 2, NUM_PERCS);
+    let step_width = 0.85 * step_dim.width;
+    let step_height = (step_dim.height - 1.).floor();
+    let style: Style = if selected {
+        style.selected()
+    } else {
+        style.default()
+    };
+    let division: usize = {
+        if step_dim.width <= 2. {
+            8
+        } else if step_dim.width <= 3. {
+            4
+        } else {
+            2
+        }
+    };
+    let grid = NUM_STEPS / division;
+
+    if style.background.is_some() || style.border_width > 0.0 {
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds,
+                border_radius: style.border_radius,
+                border_width: style.border_width,
+                border_color: style.border_color,
+            },
+            style.background
+                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
+        );
+    }
+
+    (0..=grid).into_iter()
+        .for_each(|step| {
+            let color = {
+                if step == 0 || step == grid {
+                    style.line_edge_color
+                } else {
+                    style.line_division_color
+                }
+            };
+
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle {
+                        // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
+                        x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
+                        y: bounds.y + 1.,
+                        width: step_dim.width + 1.,
+                        height: bounds.height - 2.,
+                    },
+                    border_radius: 0.,
+                    border_width: 1.,
+                    border_color: color
+                },
+                Background::Color(Color::TRANSPARENT),
+            );
+        });
+
+    events.iter().for_each(|(step, track, grid_event)| {
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: Rectangle {
+                    // x: (step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width)).round(),
+                    x: step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width),
+                    y: step_bounds.y + (*track as f32 * step_dim.height),
+                    width: step_width,
+                    height: step_height,
+                },
+                border_radius: 0.,
+                border_width: 0.,
+                border_color: Color::TRANSPARENT,
+            },
+            Background::Color(style.step_color),
+        );
+    });
+}
+
+impl<'a, Message, Renderer> Widget<Message, Renderer> for Snapshot<'a>
 where
-    Message: Clone,
-    Renderer: self::Renderer,
+    Renderer: iced_native::Renderer,
 {
     fn width(&self) -> Length {
         self.width
@@ -94,76 +181,25 @@ where
     }
 
     fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        let limits = limits
-            .width(self.width)
-            .height(self.height)
-            .pad(self.padding);
+        let limits = limits.width(self.width).height(Length::Units(self.height));
         let size = limits.resolve(Size::ZERO);
-
-        let mut node = if let Some(controls) = &self.controls {
-            let mut controls_layout =
-                controls.layout(renderer, &layout::Limits::new(Size::ZERO, size));
-
-            let controls_size = controls_layout.size();
-            let space_before_controls = size.width - controls_size.width;
-
-            controls_layout.move_to(Point::new(space_before_controls, 0.0));
-
-            layout::Node::with_children(size, vec![controls_layout])
-        } else {
-            layout::Node::with_children(size, Vec::new())
-        };
-
-        node.move_to(Point::new(
-            self.padding.left.into(),
-            self.padding.top.into(),
-        ));
-
-        layout::Node::with_children(node.size().pad(self.padding), vec![node])
-    }
-
-    fn hash_layout(&self, state: &mut Hasher) {
-        self.width.hash(state);
-        self.height.hash(state);
-        self.padding.hash(state);
-
-        if let Some(controls) = &self.controls {
-            controls.hash_layout(state);
-        }
+        layout::Node::new(size)
     }
 
     fn draw(
         &self,
         renderer: &mut Renderer,
-        _defaults: &Renderer::Defaults,
+        style: &renderer::Style,
         layout: Layout<'_>,
         cursor_position: Point,
         viewport: &Rectangle,
-    ) -> Renderer::Output {
-        let mut children = layout.children();
-        let padded = children.next().unwrap();
-        let mut children = padded.children();
-        // let snapshot_layout = children.next().unwrap();
-
-        let controls = if let Some(controls) = &self.controls {
-            let controls_layout = children.next().unwrap();
-            let show_controls = padded.bounds().contains(cursor_position);
-
-            if show_controls || self.always_show_controls {
-                Some((controls, controls_layout))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        renderer.draw(
-            padded.bounds(),
-            self.pattern.clone(),
+    ) {
+        draw(
+            renderer,
+            layout.bounds(),
+            self.pattern,
             self.selected,
-            &self.style,
-            controls,
+            self.style_sheet.as_ref(),
             cursor_position,
             viewport,
         )
@@ -176,72 +212,28 @@ where
         cursor_position: Point,
         renderer: &Renderer,
         clipboard: &mut dyn Clipboard,
-        messages: &mut Vec<Message>,
+        shell: &mut Shell<'_, Message>,
     ) -> event::Status {
-        let mut children = layout.children();
-        let padded = children.next().unwrap();
-
-        let mut children = padded.children();
-        // snapshot layout
-        // children.next();
-
-        if let Some(controls) = &mut self.controls {
-            let controls_layout = children.next().unwrap();
-
-            controls.on_event(
-                event.clone(),
-                controls_layout,
-                cursor_position,
-                renderer,
-                clipboard,
-                messages,
-            )
-        } else {
-            event::Status::Ignored
-        }
+        event::Status::Ignored
     }
 
-    fn overlay(&mut self, layout: Layout<'_>) -> Option<overlay::Element<'_, Message, Renderer>> {
-        let mut children = layout.children();
-        let padded = children.next().unwrap();
-
-        let mut children = padded.children();
-        // snapshot layout
-        // children.next();
-
-        let Self { controls, .. } = self;
-
-        match controls {
-            Some(ctr) => {
-                let controls_layout = children.next()?;
-                ctr.overlay(controls_layout)
-            }
-            None => None,
-        }
-    }
-}
-
-pub trait Renderer: iced_native::Renderer {
-    type Style: Default;
-
-    fn draw<Message>(
-        &mut self,
-        bounds: Rectangle,
-        pattern: GridPattern,
-        selected: bool,
-        style: &Self::Style,
-        controls: Option<(&Element<'_, Message, Self>, Layout<'_>)>,
+    fn mouse_interaction(
+        &self,
+        layout: Layout<'_>,
         cursor_position: Point,
-        viewport: &Rectangle,
-    ) -> Self::Output;
+        _viewport: &Rectangle,
+        _renderer: &Renderer,
+    ) -> mouse::Interaction {
+        mouse::Interaction::default()
+    }
 }
 
-impl<'a, Message, Renderer> From<Snapshot<'a, Message, Renderer>> for Element<'a, Message, Renderer>
+impl<'a, Message, Renderer> From<Snapshot<'a>> for Element<'a, Message, Renderer>
 where
-    Message: 'a + Clone,
-    Renderer: 'a + self::Renderer,
+    Renderer: 'a + iced_native::Renderer,
+    Message: 'a,
 {
-    fn from(snapshot: Snapshot<'a, Message, Renderer>) -> Element<'a, Message, Renderer> {
+    fn from(snapshot: Snapshot<'a>) -> Element<'a, Message, Renderer> {
         Element::new(snapshot)
     }
 }
