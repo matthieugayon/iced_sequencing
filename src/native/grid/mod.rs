@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use iced_native::{
     event, keyboard, layout, mouse, Clipboard,
     Element, Event, Layout, Length, Padding,
-    Point, Rectangle, Size, Widget,
+    Point, Rectangle, Size, Widget, Shell,
 };
 use iced_graphics::canvas;
 
@@ -67,7 +67,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
         self
     }
 
-    fn handle_event<F>(&mut self, handler: F, messages_queue: &mut Vec<Message>)
+    fn handle_event<F>(&mut self, handler: F, messages_queue: &mut Shell<'_, Message>)
     where
         F: FnOnce(
             &mut dyn WidgetState,
@@ -89,7 +89,7 @@ impl<'a, Message, Renderer: self::Renderer> Grid<'a, Message, Renderer> {
                 self.state.event_cache.clear();
 
                 messages.into_iter().for_each(|message| {
-                    messages_queue.push((self.on_event)(message));
+                    messages_queue.publish((self.on_event)(message));
                 });
             }
             None => {}
@@ -233,7 +233,7 @@ where
         cursor_position: Point,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
-        messages: &mut Vec<Message>,
+        messages: &mut Shell<'_, Message>,
     ) -> event::Status {
         let bounds = layout.children().next().unwrap().bounds();
 

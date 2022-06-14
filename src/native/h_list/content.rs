@@ -1,4 +1,4 @@
-use super::title_bar::TitleBar;
+use super::{title_bar::TitleBar, Draggable};
 use iced_native::{
     event, layout, overlay, Clipboard, Element,
     Event, Layout, Point, Rectangle,
@@ -219,6 +219,26 @@ where
             }
         } else {
             self.body.overlay(layout, renderer)
+        }
+    }
+}
+
+impl<'a, Message, Renderer> Draggable for &Content<'a, Message, Renderer>
+where
+    Renderer: iced_native::Renderer,
+{
+    fn can_be_dragged_at(
+        &self,
+        layout: Layout<'_>,
+        cursor_position: Point,
+    ) -> bool {
+        if let Some(title_bar) = &self.title_bar {
+            let mut children = layout.children();
+            let title_bar_layout = children.next().unwrap();
+
+            title_bar.is_over_pick_area(title_bar_layout, cursor_position)
+        } else {
+            false
         }
     }
 }
