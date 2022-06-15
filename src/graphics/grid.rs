@@ -1,4 +1,5 @@
 use crate::{core::grid::GridEvent, native::grid};
+use iced_core::mouse;
 use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
 use iced_native::Background;
@@ -30,6 +31,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         _cursor_position: Point,
         grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
+        mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
         style_sheet: &Self::Style,

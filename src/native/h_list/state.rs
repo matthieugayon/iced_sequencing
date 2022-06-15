@@ -64,7 +64,7 @@ impl Action {
     /// Returns the current [`Pane`] that is being dragged, if any.
     pub fn picked_pane(&self) -> Option<(usize, Point)> {
         match *self {
-            Action::Dragging { pane, origin, .. } => Some((pane, origin)),
+            Action::Dragging { index, origin, .. } => Some((index, origin)),
             _ => None,
         }
     }

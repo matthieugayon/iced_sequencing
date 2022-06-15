@@ -333,7 +333,7 @@ where
             cursor_position,
             shell,
             self.spacing,
-            self.elements.iter().enumerate().zip(layout.children()),
+            self.elements.iter().enumerate().map(|(idx, content)| (idx, content)),
             &self.on_click,
             &self.on_drag
         );
@@ -345,7 +345,7 @@ where
             .enumerate()
             .zip(layout.children())
             .map(|((pane, content), layout)| {
-                let is_picked = picked_pane == Some(*pane);
+                let is_picked = picked_pane == Some(pane);
 
                 content.on_event(
                     event.clone(),
@@ -368,7 +368,7 @@ where
         renderer: &Renderer,
     ) -> mouse::Interaction {
         if self.action.picked_pane().is_some() {
-            return Some(mouse::Interaction::Grab);
+            return mouse::Interaction::Grab;
         } else {
             self.elements
                 .iter()
@@ -403,9 +403,9 @@ where
             style,
             viewport,
             self.spacing,
-            self.on_resize.as_ref().map(|(leeway, _)| *leeway),
+            None,
             self.style_sheet.as_ref(),
-            self.elements.iter().map(|(pane, content)| (*pane, content)),
+            self.elements.iter().enumerate().map(|(pane, content)| (pane, content)),
             |pane, renderer, style, layout, cursor_position, rectangle| {
                 pane.draw(renderer, style, layout, cursor_position, rectangle);
             },
