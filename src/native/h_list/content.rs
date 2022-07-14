@@ -175,10 +175,28 @@ where
         //     }
         // };
 
-        let (body_layout, title_bar_interaction) = if layout.bounds().contains(cursor_position) {
-            (layout, mouse::Interaction::Grab)
+        let (mut body_layout, mut title_bar_interaction) = (layout, mouse::Interaction::default());
+
+        if let Some(title_bar) = &self.title_bar {
+            let mut children = layout.children();
+            let title_bar_layout = children.next().unwrap();
+            let bounds = layout.bounds();
+            // remove the title bar height from the bounds
+            let body_bounds = Rectangle::new(
+                Point::new(bounds.x, bounds.y + title_bar_layout.bounds().height),
+                Size::new(
+                    bounds.width,
+                    bounds.height - title_bar_layout.bounds().height,
+                ),
+            );
+            let hover_body = body_bounds.contains(cursor_position);
+            if hover_body || title_bar.is_over_pick_area(title_bar_layout, cursor_position) {
+                (body_layout, title_bar_interaction) = (layout, mouse::Interaction::Grab)
+            }
         } else {
-            (layout, mouse::Interaction::default())
+            if layout.bounds().contains(cursor_position) {
+                (body_layout, title_bar_interaction) = (layout, mouse::Interaction::Grab)
+            }
         };
 
         self.body
@@ -218,7 +236,30 @@ where
         // } else {
         //     layout.bounds().contains(cursor_position)
         // }
-        layout.bounds().contains(cursor_position)
+        // layout.bounds().contains(cursor_position)
+
+        if let Some(title_bar) = &self.title_bar {
+            let mut children = layout.children();
+            let title_bar_layout = children.next().unwrap();
+            let bounds = layout.bounds();
+            // remove the title bar height from the bounds
+            let body_bounds = Rectangle::new(
+                Point::new(bounds.x, bounds.y + title_bar_layout.bounds().height),
+                Size::new(
+                    bounds.width,
+                    bounds.height - title_bar_layout.bounds().height,
+                ),
+            );
+            let hover_body = body_bounds.contains(cursor_position);
+            if hover_body || title_bar.is_over_pick_area(title_bar_layout, cursor_position) {
+                return true;
+            }
+        } else {
+            if layout.bounds().contains(cursor_position) {
+                return true;
+            }
+        };
+        return false;
     }
 }
 
