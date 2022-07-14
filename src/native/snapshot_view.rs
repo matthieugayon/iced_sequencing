@@ -1,12 +1,13 @@
-use ganic_no_std::{pattern::Pattern, NUM_STEPS, NUM_PERCS};
-use crate::core::{grid::{GridPattern, GridEvent}, utils::get_step_dimension};
+use crate::core::{
+    grid::{GridEvent, GridPattern},
+    utils::get_step_dimension,
+};
 pub use crate::style::snapshot::{Style, StyleSheet};
+use ganic_no_std::{pattern::Pattern, NUM_PERCS, NUM_STEPS};
 
 use iced_native::{
-    event, layout, Clipboard,
-    Element, Event, Layout, Length, Padding, Point,
-    Rectangle, Size, Widget, Shell, renderer, Color,
-    Background, mouse
+    event, layout, mouse, renderer, Background, Clipboard, Color, Element, Event, Layout, Length,
+    Padding, Point, Rectangle, Shell, Size, Widget,
 };
 
 pub struct SnapshotView<'a> {
@@ -15,7 +16,7 @@ pub struct SnapshotView<'a> {
     width: Length,
     height: Length,
     style_sheet: Box<dyn StyleSheet + 'a>,
-    padding: Padding
+    padding: Padding,
 }
 
 impl<'a> SnapshotView<'a> {
@@ -26,7 +27,7 @@ impl<'a> SnapshotView<'a> {
             width,
             height,
             style_sheet: Default::default(),
-            padding: Padding::ZERO
+            padding: Padding::ZERO,
         }
     }
 
@@ -61,7 +62,7 @@ impl<'a> SnapshotView<'a> {
     }
 }
 
-pub fn draw<'a, Message, Renderer> (
+pub fn draw<'a, Message, Renderer>(
     renderer: &mut Renderer,
     bounds: Rectangle,
     pattern: GridPattern,
@@ -117,37 +118,37 @@ pub fn draw<'a, Message, Renderer> (
                 border_width: style.border_width,
                 border_color: style.border_color,
             },
-            style.background
-                    .unwrap_or(Background::Color(Color::TRANSPARENT)),
+            style
+                .background
+                .unwrap_or(Background::Color(Color::TRANSPARENT)),
         );
     }
 
-    (0..=grid).into_iter()
-        .for_each(|step| {
-            let color = {
-                if step == 0 || step == grid {
-                    style.line_edge_color
-                } else {
-                    style.line_division_color
-                }
-            };
+    (0..=grid).into_iter().for_each(|step| {
+        let color = {
+            if step == 0 || step == grid {
+                style.line_edge_color
+            } else {
+                style.line_division_color
+            }
+        };
 
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle {
-                        // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
-                        x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
-                        y: bounds.y + 1.,
-                        width: step_dim.width + 1.,
-                        height: bounds.height - 2.,
-                    },
-                    border_radius: 0.,
-                    border_width: 1.,
-                    border_color: color
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: Rectangle {
+                    // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
+                    x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
+                    y: bounds.y + 1.,
+                    width: step_dim.width + 1.,
+                    height: bounds.height - 2.,
                 },
-                Background::Color(Color::TRANSPARENT),
-            );
-        });
+                border_radius: 0.,
+                border_width: 1.,
+                border_color: color,
+            },
+            Background::Color(Color::TRANSPARENT),
+        );
+    });
 
     events.iter().for_each(|(step, track, grid_event)| {
         renderer.fill_quad(
@@ -246,44 +247,45 @@ where
                         border_width: style.border_width,
                         border_color: style.border_color,
                     },
-                    style.background
-                            .unwrap_or(Background::Color(Color::TRANSPARENT)),
+                    style
+                        .background
+                        .unwrap_or(Background::Color(Color::TRANSPARENT)),
                 );
             }
 
-            (0..=grid).into_iter()
-                .for_each(|step| {
-                    let color = {
-                        if step == 0 || step == grid {
-                            style.line_edge_color
-                        } else {
-                            style.line_division_color
-                        }
-                    };
+            (0..=grid).into_iter().for_each(|step| {
+                let color = {
+                    if step == 0 || step == grid {
+                        style.line_edge_color
+                    } else {
+                        style.line_division_color
+                    }
+                };
 
-                    renderer.fill_quad(
-                        renderer::Quad {
-                            bounds: Rectangle {
-                                // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
-                                x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
-                                y: bounds.y + 1.,
-                                width: step_dim.width + 1.,
-                                height: bounds.height - 2.,
-                            },
-                            border_radius: 0.,
-                            border_width: 1.,
-                            border_color: color
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: Rectangle {
+                            // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
+                            x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
+                            y: bounds.y + 1.,
+                            width: step_dim.width + 1.,
+                            height: bounds.height - 2.,
                         },
-                        Background::Color(Color::TRANSPARENT),
-                    );
-                });
+                        border_radius: 0.,
+                        border_width: 1.,
+                        border_color: color,
+                    },
+                    Background::Color(Color::TRANSPARENT),
+                );
+            });
 
             events.iter().for_each(|(step, track, grid_event)| {
                 renderer.fill_quad(
                     renderer::Quad {
                         bounds: Rectangle {
                             // x: (step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width)).round(),
-                            x: step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width),
+                            x: step_bounds.x
+                                + (((*step + 1) as f32 + grid_event.offset) * step_dim.width),
                             y: step_bounds.y + (*track as f32 * step_dim.height),
                             width: step_width,
                             height: step_height,
