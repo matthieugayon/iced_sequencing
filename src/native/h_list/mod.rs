@@ -1,18 +1,16 @@
 mod content;
+mod draggable;
 mod state;
 mod title_bar;
-mod draggable;
 
 pub use content::Content;
+pub use draggable::Draggable;
 pub use state::State;
 pub use title_bar::TitleBar;
-pub use draggable::Draggable;
 
 use iced_native::{
-    event, layout, mouse, overlay, Clipboard,
-    Element, Event, Layout,
-    Length, Point, Rectangle, Size, Vector,
-    Widget, renderer, Shell, touch
+    event, layout, mouse, overlay, renderer, touch, Clipboard, Element, Event, Layout, Length,
+    Point, Rectangle, Shell, Size, Vector, Widget,
 };
 
 pub use crate::style::h_list::{Style, StyleSheet};
@@ -138,9 +136,7 @@ pub fn update<'a, Message, T: Draggable>(
                 if let Some(on_drag) = on_drag {
                     let mut dropped_region = elements
                         .zip(layout.children())
-                        .filter(|(_, layout)| {
-                            layout.bounds().contains(cursor_position)
-                        });
+                        .filter(|(_, layout)| layout.bounds().contains(cursor_position));
 
                     let event = match dropped_region.next() {
                         Some(((target, _), _)) if pane != target => {
@@ -187,8 +183,7 @@ fn click_pane<'a, Message, T>(
             if content.can_be_dragged_at(layout, cursor_position) {
                 let pane_position = layout.position();
 
-                let origin = cursor_position
-                    - Vector::new(pane_position.x, pane_position.y);
+                let origin = cursor_position - Vector::new(pane_position.x, pane_position.y);
 
                 *action = state::Action::Dragging { index: id, origin };
 
@@ -209,14 +204,7 @@ pub fn draw<Renderer, T>(
     resize_leeway: Option<u16>,
     style_sheet: &dyn StyleSheet,
     elements: impl Iterator<Item = (usize, T)>,
-    draw_pane: impl Fn(
-        T,
-        &mut Renderer,
-        &renderer::Style,
-        Layout<'_>,
-        Point,
-        &Rectangle,
-    ),
+    draw_pane: impl Fn(T, &mut Renderer, &renderer::Style, Layout<'_>, Point, &Rectangle),
 ) where
     Renderer: iced_native::Renderer,
 {
@@ -235,22 +223,22 @@ pub fn draw<Renderer, T>(
             Some((dragging, origin)) if id == dragging => {
                 let bounds = layout.bounds();
 
-                renderer.with_translation(
-                    cursor_position
-                        - Point::new(bounds.x + origin.x, bounds.y + origin.y),
-                    |renderer| {
-                        renderer.with_layer(bounds, |renderer| {
-                            draw_pane(
-                                pane,
-                                renderer,
-                                style,
-                                layout,
-                                pane_cursor_position,
-                                viewport,
-                            );
-                        });
-                    },
-                );
+                // translate the pane along the x-axis only
+                let mut t = cursor_position - Point::new(bounds.x + origin.x, bounds.y + origin.y);
+                t.y = 0.0;
+
+                renderer.with_translation(t, |renderer| {
+                    renderer.with_layer(bounds, |renderer| {
+                        draw_pane(
+                            pane,
+                            renderer,
+                            style,
+                            layout,
+                            pane_cursor_position,
+                            viewport,
+                        );
+                    });
+                });
             }
             _ => {
                 draw_pane(
@@ -273,12 +261,10 @@ pub enum DragEvent {
     Canceled { pane: usize },
 }
 
-impl<'a, Message, Renderer> Widget<Message, Renderer>
-    for HList<'a, Message, Renderer>
+impl<'a, Message, Renderer> Widget<Message, Renderer> for HList<'a, Message, Renderer>
 where
-    Renderer: iced_native::Renderer
+    Renderer: iced_native::Renderer,
 {
-
     fn width(&self) -> Length {
         self.width
     }
@@ -287,16 +273,14 @@ where
         self.height
     }
 
-    fn layout(
-        &self,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let limits = limits.width(self.width).height(self.height);
         let size = limits.resolve(Size::ZERO);
         let number_of_elements = self.elements.len();
 
-        let children = self.elements.iter()
+        let children = self
+            .elements
+            .iter()
             .enumerate()
             .filter_map(|(pane, element)| {
                 let area_width = size.width / number_of_elements as f32;
@@ -333,9 +317,12 @@ where
             cursor_position,
             shell,
             self.spacing,
-            self.elements.iter().enumerate().map(|(idx, content)| (idx, content)),
+            self.elements
+                .iter()
+                .enumerate()
+                .map(|(idx, content)| (idx, content)),
             &self.on_click,
-            &self.on_drag
+            &self.on_drag,
         );
 
         let picked_pane = self.action.picked_pane().map(|(pane, _)| pane);
@@ -375,12 +362,7 @@ where
                 .enumerate()
                 .zip(layout.children())
                 .map(|((_pane, content), layout)| {
-                    content.mouse_interaction(
-                        layout,
-                        cursor_position,
-                        viewport,
-                        renderer,
-                    )
+                    content.mouse_interaction(layout, cursor_position, viewport, renderer)
                 })
                 .max()
                 .unwrap_or_default()
@@ -405,7 +387,10 @@ where
             self.spacing,
             None,
             self.style_sheet.as_ref(),
-            self.elements.iter().enumerate().map(|(pane, content)| (pane, content)),
+            self.elements
+                .iter()
+                .enumerate()
+                .map(|(pane, content)| (pane, content)),
             |pane, renderer, style, layout, cursor_position, rectangle| {
                 pane.draw(renderer, style, layout, cursor_position, rectangle);
             },
