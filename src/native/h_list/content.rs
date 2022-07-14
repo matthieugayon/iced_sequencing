@@ -1,8 +1,7 @@
 use super::{title_bar::TitleBar, Draggable};
 use iced_native::{
-    event, layout, overlay, Clipboard, Element,
-    Event, Layout, Point, Rectangle,
-    Size, widget::container, Shell, mouse
+    event, layout, mouse, overlay, widget::container, Clipboard, Element, Event, Layout, Point,
+    Rectangle, Shell, Size,
 };
 
 pub struct Content<'a, Message, Renderer> {
@@ -10,7 +9,6 @@ pub struct Content<'a, Message, Renderer> {
     body: Element<'a, Message, Renderer>,
     style_sheet: Box<dyn container::StyleSheet + 'a>,
 }
-
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
 where
@@ -30,8 +28,7 @@ where
     }
 
     /// Sets the style of the [`Content`].
-    pub fn style(mut self, style_sheet: impl Into<Box<dyn container::StyleSheet + 'a>>,
-    ) -> Self {
+    pub fn style(mut self, style_sheet: impl Into<Box<dyn container::StyleSheet + 'a>>) -> Self {
         self.style_sheet = style_sheet.into();
         self
     }
@@ -72,13 +69,8 @@ where
                 show_controls,
             );
 
-            self.body.draw(
-                renderer,
-                style,
-                body_layout,
-                cursor_position,
-                viewport,
-            );
+            self.body
+                .draw(renderer, style, body_layout, cursor_position, viewport);
         } else {
             self.body
                 .draw(renderer, style, layout, cursor_position, viewport);
@@ -95,15 +87,19 @@ where
         //     false
         // }
 
-        layout.bounds().contains(cursor_position)
+        let pickable = layout.bounds().contains(cursor_position);
+
+        dbg!("pickaboo {}", pickable);
+
+        pickable
     }
 
     pub(crate) fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         if let Some(title_bar) = &self.title_bar {
             let max_size = limits.max();
 
-            let title_bar_layout = title_bar
-                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+            let title_bar_layout =
+                title_bar.layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
 
             let title_bar_size = title_bar_layout.size();
 
@@ -111,13 +107,13 @@ where
                 renderer,
                 &layout::Limits::new(
                     Size::ZERO,
-                    Size::new(max_size.width,max_size.height - title_bar_size.height),
+                    Size::new(max_size.width, max_size.height - title_bar_size.height),
                 ),
             );
 
             body_layout.move_to(Point::new(0.0, title_bar_size.height));
 
-            layout::Node::with_children(max_size,vec![title_bar_layout, body_layout])
+            layout::Node::with_children(max_size, vec![title_bar_layout, body_layout])
         } else {
             self.body.layout(renderer, limits)
         }
@@ -134,7 +130,6 @@ where
         is_picked: bool,
     ) -> event::Status {
         let mut event_status = event::Status::Ignored;
-
         let body_layout = if let Some(title_bar) = &mut self.title_bar {
             let mut children = layout.children();
 
@@ -175,29 +170,27 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        let (body_layout, title_bar_interaction) =
-            if let Some(title_bar) = &self.title_bar {
-                let mut children = layout.children();
-                let title_bar_layout = children.next().unwrap();
+        let (body_layout, title_bar_interaction) = if let Some(title_bar) = &self.title_bar {
+            let mut children = layout.children();
+            let title_bar_layout = children.next().unwrap();
 
-                let is_over_pick_area = title_bar
-                    .is_over_pick_area(title_bar_layout, cursor_position);
+            let is_over_pick_area = title_bar.is_over_pick_area(title_bar_layout, cursor_position);
 
-                if is_over_pick_area {
-                    return mouse::Interaction::Grab;
-                }
+            if is_over_pick_area {
+                return mouse::Interaction::Grab;
+            }
 
-                let mouse_interaction = title_bar.mouse_interaction(
-                    title_bar_layout,
-                    cursor_position,
-                    viewport,
-                    renderer,
-                );
+            let mouse_interaction =
+                title_bar.mouse_interaction(title_bar_layout, cursor_position, viewport, renderer);
 
-                (children.next().unwrap(), mouse_interaction)
+            (children.next().unwrap(), mouse_interaction)
+        } else {
+            if layout.bounds().contains(cursor_position) {
+                (layout, mouse::Interaction::Grab)
             } else {
                 (layout, mouse::Interaction::default())
-            };
+            }
+        };
 
         self.body
             .mouse_interaction(body_layout, cursor_position, viewport, renderer)
@@ -227,18 +220,14 @@ impl<'a, Message, Renderer> Draggable for &Content<'a, Message, Renderer>
 where
     Renderer: iced_native::Renderer,
 {
-    fn can_be_dragged_at(
-        &self,
-        layout: Layout<'_>,
-        cursor_position: Point,
-    ) -> bool {
+    fn can_be_dragged_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
         if let Some(title_bar) = &self.title_bar {
             let mut children = layout.children();
             let title_bar_layout = children.next().unwrap();
 
             title_bar.is_over_pick_area(title_bar_layout, cursor_position)
         } else {
-            false
+            layout.bounds().contains(cursor_position)
         }
     }
 }
@@ -246,7 +235,7 @@ where
 impl<'a, T, Message, Renderer> From<T> for Content<'a, Message, Renderer>
 where
     T: Into<Element<'a, Message, Renderer>>,
-    Renderer: iced_native::Renderer
+    Renderer: iced_native::Renderer,
 {
     fn from(element: T) -> Self {
         Self::new(element)
