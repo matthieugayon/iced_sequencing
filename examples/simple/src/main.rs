@@ -1,7 +1,7 @@
 // Import iced modules.
 use iced::{
     Button, Color, Column, Container,
-    Element, Length, Sandbox, Settings, Text, button, 
+    Element, Length, Sandbox, Settings, Text, button,
     container, Alignment
 };
 
@@ -168,7 +168,7 @@ impl Sandbox for App {
                     .push(pane.controls.view(pane_index, number_of_snapshots));
                     
                 let is_focused = current_snapshot == pane_index;
-                let snapshot = snapshot::Snapshot::new(
+                let snapshot = snapshot::SnapshotView::new(
                         GridPattern::from(pane.data),
                         Length::Fill,
                         Length::Fill

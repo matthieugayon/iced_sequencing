@@ -2,7 +2,7 @@
 name = "iced_sequencing"
 version = "0.0.1"
 authors = ["matthieu gayon <matthieu.gayon@gmail.com>"]
-edition = "2018"
+edition = "2021"
 resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -15,14 +15,14 @@ members = [
 ]
 
 [dev-dependencies]
-iced = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
+iced = { version = "0.4.2", features = ["wgpu"] }
 
 [dependencies]
-web-sys = "0.3.51"
-iced_core = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
-iced_native = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
-iced_style = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
-iced_graphics = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" , features = ["canvas"] }
+# web-sys = "0.3.51"
+iced_core = "0.5.0"
+iced_native = "0.5.0"
+iced_style = "0.4.0"
+iced_graphics = { version = "0.3.0", features = ["canvas"] }
 
 ganic-no-std = { path = "../ganic_rs-workspace/ganic-no-std" }
 itertools = "0.9.0"

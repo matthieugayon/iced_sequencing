@@ -2,14 +2,13 @@
 name = "simple"
 version = "0.1.0"
 authors = ["matthieu gayon <matthieu.gayon@gmail.com>"]
-edition = "2018"
+edition = "2021"
 resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
-iced_native = { git = "https://github.com/iced-rs/iced", rev = "35c4ad6" }
+iced = { version = "0.4.2", features = ["wgpu"] }
 
 iced_sequencing = { path = "../../" }
 ganic-no-std = { path = "../../../ganic_rs-workspace/ganic-no-std" }
