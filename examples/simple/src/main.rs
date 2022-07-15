@@ -2,13 +2,11 @@
 use iced::{
     Button, Color, Column, Container,
     Element, Length, Sandbox, Settings, Text, button,
-    container, Alignment
+    container, Alignment, Padding
 };
 
-use iced_native::Padding;
-
 // Import iced_audio sequencing.
-use iced_sequencing::{grid, snapshot, h_list, multi_slider};
+use iced_sequencing::{grid, snapshot_view, h_list, multi_slider};
 use iced_sequencing::core::grid::{
     GridPattern,
     GridMessage,
@@ -85,7 +83,7 @@ impl Sandbox for App {
     }
 
     fn update(&mut self, event: Message) {
-        // println!("--- update {:?}", event);
+        println!("--- update {:?}", event);
 
         match event {
             Message::GridEvent(grid_message) => {
@@ -146,7 +144,7 @@ impl Sandbox for App {
                     let current_snapshot = self.snapshot_list.get(self.current_snapshot).unwrap().data;
                     self.grid_state.set_pattern(GridPattern::from(current_snapshot));
                 }
-                
+
                 self.snapshot_list.remove(delete_index);
             },
         }
@@ -159,29 +157,27 @@ impl Sandbox for App {
             .velocities(self.focused_track)
             .to_vec();
 
-        let number_of_snapshots = self.snapshot_list.len(); 
+        let number_of_snapshots = self.snapshot_list.len();
         let current_snapshot = self.current_snapshot;
-        
+
         let list = h_list::HList::new(&mut self.snapshot_list, |pane_index, pane| {
                 let controls = Column::new()
                     .padding(5)
                     .push(pane.controls.view(pane_index, number_of_snapshots));
-                    
+
                 let is_focused = current_snapshot == pane_index;
-                let snapshot = snapshot::SnapshotView::new(
+                let snapshot = snapshot_view::SnapshotView::new(
                         GridPattern::from(pane.data),
                         Length::Fill,
                         Length::Fill
                     )
-                    .select(is_focused)
-                    .controls(controls);
-                
-                h_list::Content::new(snapshot)
+                    .select(is_focused);
+
+                h_list::Content::new(snapshot).controls(controls)
             })
             .width(Length::Fill)
             .height(Length::from(Length::Units(60)))
             .spacing(2)
-            .padding(Padding::from(4))
             .on_click(Message::Clicked)
             .on_drag(Message::Dragged);
 
