@@ -1,13 +1,14 @@
-use super::{title_bar::TitleBar, Draggable};
+use super::Draggable;
 use iced_native::{
     event, layout, mouse, overlay, widget::container, Clipboard, Element, Event, Layout, Point,
     Rectangle, Shell, Size,
 };
 
 pub struct Content<'a, Message, Renderer> {
-    title_bar: Option<TitleBar<'a, Message, Renderer>>,
     body: Element<'a, Message, Renderer>,
+    controls: Option<Element<'a, Message, Renderer>>,
     style_sheet: Box<dyn container::StyleSheet + 'a>,
+    always_show_controls: bool
 }
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
@@ -16,20 +17,25 @@ where
 {
     pub fn new(body: impl Into<Element<'a, Message, Renderer>>) -> Self {
         Self {
-            title_bar: None,
             body: body.into(),
+            controls: None,
             style_sheet: Default::default(),
+            always_show_controls: false
         }
     }
 
-    pub fn title_bar(mut self, title_bar: TitleBar<'a, Message, Renderer>) -> Self {
-        self.title_bar = Some(title_bar);
+    pub fn style(mut self, style_sheet: impl Into<Box<dyn container::StyleSheet + 'a>>) -> Self {
+        self.style_sheet = style_sheet.into();
         self
     }
 
-    /// Sets the style of the [`Content`].
-    pub fn style(mut self, style_sheet: impl Into<Box<dyn container::StyleSheet + 'a>>) -> Self {
-        self.style_sheet = style_sheet.into();
+    pub fn controls(mut self, controls: impl Into<Element<'a, Message, Renderer>>) -> Self {
+        self.controls = Some(controls.into());
+        self
+    }
+
+    pub fn always_show_controls(mut self) -> Self {
+        self.always_show_controls = true;
         self
     }
 }
@@ -53,24 +59,23 @@ where
             container::draw_background(renderer, &style, bounds);
         }
 
-        if let Some(title_bar) = &self.title_bar {
+        if let Some(controls) = &self.controls {
             let mut children = layout.children();
-            let title_bar_layout = children.next().unwrap();
             let body_layout = children.next().unwrap();
-
-            let show_controls = bounds.contains(cursor_position);
-
-            title_bar.draw(
-                renderer,
-                style,
-                title_bar_layout,
-                cursor_position,
-                viewport,
-                show_controls,
-            );
+            let controls_layout = children.next().unwrap();
 
             self.body
                 .draw(renderer, style, body_layout, cursor_position, viewport);
+
+            if bounds.contains(cursor_position) || self.always_show_controls {
+                controls.draw(
+                    renderer,
+                    &style,
+                    controls_layout,
+                    cursor_position,
+                    viewport
+                );
+            }
         } else {
             self.body
                 .draw(renderer, style, layout, cursor_position, viewport);
@@ -78,25 +83,24 @@ where
     }
 
     pub(crate) fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        if let Some(title_bar) = &self.title_bar {
+        let body_layout = self.body.layout(renderer, limits);
+
+        if let Some(controls) = &self.controls {
             let max_size = limits.max();
+            let mut controls_layout = controls
+                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
 
-            let title_bar_layout =
-                title_bar.layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+            let controls_size = controls_layout.size();
+            let space_before_controls = max_size.width - controls_size.width;
 
-            let title_bar_size = title_bar_layout.size();
+            let height = body_layout.size().height.max(controls_size.height);
 
-            let mut body_layout = self.body.layout(
-                renderer,
-                &layout::Limits::new(
-                    Size::ZERO,
-                    Size::new(max_size.width, max_size.height - title_bar_size.height),
-                ),
-            );
+            controls_layout.move_to(Point::new(space_before_controls, 0.0));
 
-            body_layout.move_to(Point::new(0.0, title_bar_size.height));
-
-            layout::Node::with_children(max_size, vec![title_bar_layout, body_layout])
+            layout::Node::with_children(
+                Size::new(max_size.width, height),
+                vec![body_layout, controls_layout],
+            )
         } else {
             self.body.layout(renderer, limits)
         }
@@ -113,19 +117,22 @@ where
         is_picked: bool,
     ) -> event::Status {
         let mut event_status = event::Status::Ignored;
-        let body_layout = if let Some(title_bar) = &mut self.title_bar {
-            let mut children = layout.children();
 
-            event_status = title_bar.on_event(
+        let body_layout = if let Some(controls) = &mut self.controls {
+            let mut children = layout.children();
+            let body_layout = children.next().unwrap();
+            let controls_layout = children.next().unwrap();
+
+            event_status = controls.on_event(
                 event.clone(),
-                children.next().unwrap(),
+                controls_layout,
                 cursor_position,
                 renderer,
                 clipboard,
-                shell,
+                shell
             );
 
-            children.next().unwrap()
+            body_layout
         } else {
             layout
         };
@@ -153,33 +160,32 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        let (mut body_layout, mut title_bar_interaction) = (layout, mouse::Interaction::default());
-
-        if let Some(title_bar) = &self.title_bar {
+        let mut mouse_interaction = mouse::Interaction::default();
+        let body_layout = if self.controls.is_some() {
             let mut children = layout.children();
-            let title_bar_layout = children.next().unwrap();
-            let bounds = layout.bounds();
-            // remove the title bar height from the bounds
-            let body_bounds = Rectangle::new(
-                Point::new(bounds.x, bounds.y + title_bar_layout.bounds().height),
-                Size::new(
-                    bounds.width,
-                    bounds.height - title_bar_layout.bounds().height,
-                ),
-            );
-            let hover_body = body_bounds.contains(cursor_position);
-            if hover_body || title_bar.is_over_pick_area(title_bar_layout, cursor_position) {
-                (body_layout, title_bar_interaction) = (layout, mouse::Interaction::Grab)
-            }
+            children.next().unwrap()
         } else {
-            if layout.bounds().contains(cursor_position) {
-                (body_layout, title_bar_interaction) = (layout, mouse::Interaction::Grab)
-            }
+            layout
         };
+
+        if body_layout.bounds().contains(cursor_position) {
+            mouse_interaction = mouse::Interaction::Grab;
+        }
+
+        if let Some(controls) = &self.controls {
+            let mut children = layout.children();
+            children.next();
+            let controls_layout = children.next().unwrap();
+            let hover_controls = controls_layout.bounds().contains(cursor_position);
+
+            if hover_controls {
+                mouse_interaction = controls.mouse_interaction(controls_layout, cursor_position, viewport, renderer);
+            }
+        }
 
         self.body
             .mouse_interaction(body_layout, cursor_position, viewport, renderer)
-            .max(title_bar_interaction)
+            .max(mouse_interaction)
     }
 
     pub(crate) fn overlay(
@@ -187,14 +193,11 @@ where
         layout: Layout<'_>,
         renderer: &Renderer,
     ) -> Option<overlay::Element<'_, Message, Renderer>> {
-        if let Some(title_bar) = self.title_bar.as_mut() {
+        if let Some(controls) = self.controls.as_mut() {
             let mut children = layout.children();
-            let title_bar_layout = children.next()?;
-
-            match title_bar.overlay(title_bar_layout, renderer) {
-                Some(overlay) => Some(overlay),
-                None => self.body.overlay(children.next()?, renderer),
-            }
+            children.next()?;
+            let controls_layout = children.next()?;
+            controls.overlay(controls_layout, renderer)
         } else {
             self.body.overlay(layout, renderer)
         }
@@ -206,20 +209,15 @@ where
     Renderer: iced_native::Renderer,
 {
     fn can_be_dragged_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
-        if let Some(title_bar) = &self.title_bar {
+        if self.controls.is_some() {
             let mut children = layout.children();
-            let title_bar_layout = children.next().unwrap();
-            let bounds = layout.bounds();
-            // remove the title bar height from the bounds
-            let body_bounds = Rectangle::new(
-                Point::new(bounds.x, bounds.y + title_bar_layout.bounds().height),
-                Size::new(
-                    bounds.width,
-                    bounds.height - title_bar_layout.bounds().height,
-                ),
-            );
-            let hover_body = body_bounds.contains(cursor_position);
-            if hover_body || title_bar.is_over_pick_area(title_bar_layout, cursor_position) {
+            let body_layout = children.next().unwrap();
+            let controls_layout = children.next().unwrap();
+
+            let hover_body = body_layout.bounds().contains(cursor_position);
+            let hover_controls = controls_layout.bounds().contains(cursor_position);
+
+            if hover_body && !hover_controls {
                 return true;
             }
         } else {

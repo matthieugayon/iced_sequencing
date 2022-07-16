@@ -286,24 +286,24 @@ impl WidgetState for Selecting {
     ) -> (Transition, Option<Vec<GridMessage>>) {
         let selection = Rectangle {
             x: if cursor.x - self.origin.x < 0.0 {
-                cursor.x - bounds.x
+                (cursor.x - bounds.x).max(0.5)
             } else {
                 self.origin.x - bounds.x
             },
             y: if cursor.y - self.origin.y < 0.0 {
-                cursor.y - bounds.y
+                (cursor.y - bounds.y).max(0.5)
             } else {
                 self.origin.y - bounds.y
             },
             width: if cursor.x - self.origin.x < 0.0 {
-                self.origin.x - cursor.x
+                (self.origin.x - cursor.x).min(self.origin.x - bounds.x - 0.5)
             } else {
-                cursor.x - self.origin.x
+                (cursor.x - self.origin.x).min(bounds.x + bounds.width - self.origin.x - 0.5)
             },
             height: if cursor.y - self.origin.y < 0.0 {
-                self.origin.y - cursor.y
+                (self.origin.y - cursor.y).min(self.origin.y - bounds.y - 0.5)
             } else {
-                cursor.y - self.origin.y
+                (cursor.y - self.origin.y).min(bounds.y + bounds.height - self.origin.y - 0.5)
             },
         };
 
@@ -364,14 +364,17 @@ impl WidgetState for MovingSelectionQuantized {
         let movement =
             base_pattern.move_selection_quantized(bounds, drag_bounds, cursor, self.origin_event);
 
-        if movement.0 != 0. || movement.1 != 0 {
-            return (
-                Transition::DoNothing,
-                Some(vec![GridMessage::MoveSelection(movement, false)]),
-            );
-        }
+        // if movement.0 != 0. || movement.1 != 0 {
+        //     return (
+        //         Transition::DoNothing,
+        //         Some(vec![GridMessage::MoveSelection(movement, false)]),
+        //     );
+        // }
 
-        (Transition::DoNothing, None)
+        (
+            Transition::DoNothing,
+            Some(vec![GridMessage::MoveSelection(movement, false)]),
+        )
     }
 
     fn on_modifier_change(
@@ -429,8 +432,6 @@ impl WidgetState for MovingSelectionUnquantized {
         base_pattern: GridPattern,
         _context: &mut WidgetContext,
     ) -> (Transition, Option<Vec<GridMessage>>) {
-        // cursor cannot get out of the grid area (container padding excluded)
-        // let padded_cursor = pad_cursor(cursor, bounds);
         let drag_bounds = Rectangle {
             x: self.origin.x,
             y: self.origin.y,

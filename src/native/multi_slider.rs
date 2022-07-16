@@ -128,9 +128,10 @@ pub fn draw<T, Renderer>(
     let hovered_slider_style = style_sheet.hovered(base_color);
     let bounds = layout.bounds();
     let slider_width = bounds.width / values.len() as f32;
-    let (range_start, range_end) = range.into_inner();
-
-    let mut primitives = vec![];
+    let (range_start, range_end) = {
+        let (start, end) = range.clone().into_inner();
+        (start.into() as f32, end.into() as f32)
+    };
 
     if style.background.is_some() || style.border_width > 0.0 {
         renderer.fill_quad(
@@ -146,9 +147,10 @@ pub fn draw<T, Renderer>(
         );
     }
 
-    values.iter()
+    values.into_iter()
         .enumerate()
         .for_each(|(index, value)| {
+            let value = value.into() as f32;
             let ranged_value = if range_start >= range_end {
                 0.0
             } else {
@@ -222,7 +224,7 @@ impl State {
 
 impl<'a, T, Message, Renderer> Widget<Message, Renderer> for MultiSlider<'a, T, Message>
 where
-    T: Copy + Into<f64> + num_traits::FromPrimitive + std::fmt::Debug,
+    T: Copy + Into<f64> + num_traits::FromPrimitive,
     Message: Clone,
     Renderer: iced_native::Renderer,
 {
@@ -235,7 +237,7 @@ where
     }
 
     fn layout(&self, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        let limits = limits.width(self.width).height(Length::Units(self.height));
+        let limits = limits.width(self.width).height(self.height);
         let size = limits.resolve(Size::ZERO);
         layout::Node::new(size)
     }
@@ -249,30 +251,30 @@ where
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
     ) -> event::Status {
-        let content_bounds = layout.children().next().unwrap().bounds();
-        let slider_width = content_bounds.width / self.values.len() as f32;
+        let bounds = layout.bounds();
+        let slider_width = bounds.width / self.values.len() as f32;
         let max_index = self.values.len() - 1;
         let get_slider_index = |cursor: Point| -> usize {
-            if cursor.x >= content_bounds.x + content_bounds.width {
+            if cursor.x >= bounds.x + bounds.width {
                 max_index
-            } else if cursor.x >= content_bounds.x {
-                (((cursor.x - content_bounds.x) / slider_width) as usize).min(max_index)
+            } else if cursor.x >= bounds.x {
+                (((cursor.x - bounds.x) / slider_width) as usize).min(max_index)
             } else {
                 0
             }
         };
 
         let interpolate_value = |(cursor_y, slider)| -> (Option<T>, usize) {
-            if cursor_y >= content_bounds.y + content_bounds.height {
+            if cursor_y >= bounds.y + bounds.height {
                 (Some(*self.range.start()), slider)
-            } else if cursor_y <= content_bounds.y {
+            } else if cursor_y <= bounds.y {
                 (Some(*self.range.end()), slider)
             } else {
                 let step = self.step.into();
                 let start = (*self.range.start()).into();
                 let end = (*self.range.end()).into();
-                let percent = f64::from(content_bounds.y + content_bounds.height - cursor_y)
-                    / f64::from(content_bounds.height);
+                let percent = f64::from(bounds.y + bounds.height - cursor_y)
+                    / f64::from(bounds.height);
 
                 let steps = (percent * (end - start) / step).round();
                 let value = steps * step + start;
@@ -343,7 +345,7 @@ where
                         Some(value) => {
                             let mut values: Vec<T> = self.values.clone();
                             values[current_slider_index] = value;
-                            messages.push((self.on_change)(values));
+                            shell.publish((self.on_change)(values));
                         }
                         None => {}
                     }
@@ -365,7 +367,7 @@ where
             | Event::Touch(touch::Event::FingerLost { .. }) => {
                 if self.state.last_cursor_position.is_some() {
                     if let Some(on_release) = self.on_release.clone() {
-                        messages.push(on_release);
+                        shell.publish(on_release);
                     }
                     self.state.last_cursor_position = None;
                     return event::Status::Captured;
@@ -393,20 +395,11 @@ where
         cursor_position: Point,
         _viewport: &Rectangle,
     ) {
-        // let content_bounds = layout.children().next().unwrap().bounds();
-        // let start = *self.range.start();
-        // let end = *self.range.end();
-        // let values: Vec<f32> = self
-        //     .values
-        //     .iter()
-        //     .map(|&value| value.into() as f32)
-        //     .collect();
-
         draw(
             renderer,
             layout,
             cursor_position,
-            self.values,
+            self.values.clone(),
             &self.range,
             self.style_sheet.as_ref(),
             self.base_color,
@@ -417,8 +410,8 @@ where
 
     fn mouse_interaction(
         &self,
-        layout: Layout<'_>,
-        cursor_position: Point,
+        _layout: Layout<'_>,
+        _cursor_position: Point,
         _viewport: &Rectangle,
         _renderer: &Renderer,
     ) -> mouse::Interaction {

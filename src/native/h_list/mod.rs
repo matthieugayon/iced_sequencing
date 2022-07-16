@@ -1,12 +1,10 @@
 mod content;
 mod draggable;
 mod state;
-mod title_bar;
 
 pub use content::Content;
 pub use draggable::Draggable;
 pub use state::State;
-pub use title_bar::TitleBar;
 
 use iced_native::{
     event, layout, mouse, overlay, renderer, touch, Clipboard, Element, Event, Layout, Length,
@@ -355,7 +353,7 @@ where
         renderer: &Renderer,
     ) -> mouse::Interaction {
         if self.action.picked_pane().is_some() {
-            return mouse::Interaction::Grab;
+            return mouse::Interaction::Grabbing;
         } else {
             self.elements
                 .iter()

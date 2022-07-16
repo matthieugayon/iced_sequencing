@@ -13,7 +13,7 @@ use std::fmt::Debug;
 
 pub trait WidgetState: Debug {
     fn on_cancelled(&mut self, _context: &mut WidgetContext) {}
-    
+
     fn on_blur(
         &mut self
     ) -> (Transition, Option<Vec<GridMessage>>) {

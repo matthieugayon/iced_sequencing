@@ -319,5 +319,5 @@ impl Input {
             .push(Text::new(String::from(self.target)).size(14))
             .align_items(Alignment::Center)
             .into()
-    }   
+    }
 }

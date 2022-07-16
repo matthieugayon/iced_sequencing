@@ -6,7 +6,7 @@ use iced_native::{
 };
 use iced_graphics::canvas;
 
-use ganic_no_std::NUM_PERCS;
+use ganic_no_std::{NUM_PERCS, NUM_STEPS};
 use crate::core::grid::{GridMessage, GridPattern};
 pub use crate::style::multi_slider::{Style, StyleSheet};
 
@@ -161,7 +161,7 @@ impl State {
             Some(current_movement) => {
                 if relative {
                     self.temp_movement = Some((
-                        current_movement.0 + movement.0,
+                        (current_movement.0 + movement.0) % NUM_STEPS as f32,
                         current_movement.1 + movement.1
                     ));
                 } else {

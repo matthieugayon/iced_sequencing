@@ -7,10 +7,12 @@ pub mod style;
 pub use native::h_list;
 pub use native::grid;
 pub use native::snapshot_view;
+pub use native::multi_slider;
 
 pub use grid::*;
 pub use h_list::*;
 pub use snapshot_view::*;
+pub use multi_slider::*;
 
 // #[cfg(not(target_arch = "wasm32"))]
 // mod platform {
