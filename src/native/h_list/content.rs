@@ -153,28 +153,6 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        // let (body_layout, title_bar_interaction) = if let Some(title_bar) = &self.title_bar {
-        //     let mut children = layout.children();
-        //     let title_bar_layout = children.next().unwrap();
-
-        //     let is_over_pick_area = title_bar.is_over_pick_area(title_bar_layout, cursor_position);
-
-        //     if is_over_pick_area {
-        //         return mouse::Interaction::Grab;
-        //     }
-
-        //     let mouse_interaction =
-        //         title_bar.mouse_interaction(title_bar_layout, cursor_position, viewport, renderer);
-
-        //     (children.next().unwrap(), mouse_interaction)
-        // } else {
-        //     if layout.bounds().contains(cursor_position) {
-        //         (layout, mouse::Interaction::Grab)
-        //     } else {
-        //         (layout, mouse::Interaction::default())
-        //     }
-        // };
-
         let (mut body_layout, mut title_bar_interaction) = (layout, mouse::Interaction::default());
 
         if let Some(title_bar) = &self.title_bar {
@@ -228,16 +206,6 @@ where
     Renderer: iced_native::Renderer,
 {
     fn can_be_dragged_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
-        // if let Some(title_bar) = &self.title_bar {
-        //     let mut children = layout.children();
-        //     let title_bar_layout = children.next().unwrap();
-
-        //     title_bar.is_over_pick_area(title_bar_layout, cursor_position)
-        // } else {
-        //     layout.bounds().contains(cursor_position)
-        // }
-        // layout.bounds().contains(cursor_position)
-
         if let Some(title_bar) = &self.title_bar {
             let mut children = layout.children();
             let title_bar_layout = children.next().unwrap();

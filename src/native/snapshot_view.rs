@@ -62,112 +62,6 @@ impl<'a> SnapshotView<'a> {
     }
 }
 
-pub fn draw<'a, Message, Renderer>(
-    renderer: &mut Renderer,
-    bounds: Rectangle,
-    pattern: GridPattern,
-    selected: bool,
-    style: &dyn StyleSheet,
-    cursor_position: Point,
-    viewport: &Rectangle,
-) where
-    Renderer: iced_native::Renderer,
-{
-    let mut events: Vec<(usize, usize, GridEvent)> = pattern
-        .data
-        .iter()
-        .map(|((step, track), grid_event)| (*step, *track, *grid_event))
-        .collect();
-
-    events.sort_by(|x, y| {
-        if x.1 == y.1 {
-            return x.0.cmp(&y.0);
-        }
-        x.1.cmp(&y.1)
-    });
-
-    let step_bounds = Rectangle {
-        height: bounds.height - 3.,
-        y: bounds.y + 2.,
-        ..bounds
-    };
-    let step_dim: Size = get_step_dimension(step_bounds, NUM_STEPS + 2, NUM_PERCS);
-    let step_width = 0.85 * step_dim.width;
-    let step_height = (step_dim.height - 1.).floor();
-    let style: Style = if selected {
-        style.selected()
-    } else {
-        style.default()
-    };
-    let division: usize = {
-        if step_dim.width <= 2. {
-            8
-        } else if step_dim.width <= 3. {
-            4
-        } else {
-            2
-        }
-    };
-    let grid = NUM_STEPS / division;
-
-    if style.background.is_some() || style.border_width > 0.0 {
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds,
-                border_radius: style.border_radius,
-                border_width: style.border_width,
-                border_color: style.border_color,
-            },
-            style
-                .background
-                .unwrap_or(Background::Color(Color::TRANSPARENT)),
-        );
-    }
-
-    (0..=grid).into_iter().for_each(|step| {
-        let color = {
-            if step == 0 || step == grid {
-                style.line_edge_color
-            } else {
-                style.line_division_color
-            }
-        };
-
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: Rectangle {
-                    // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
-                    x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
-                    y: bounds.y + 1.,
-                    width: step_dim.width + 1.,
-                    height: bounds.height - 2.,
-                },
-                border_radius: 0.,
-                border_width: 1.,
-                border_color: color,
-            },
-            Background::Color(Color::TRANSPARENT),
-        );
-    });
-
-    events.iter().for_each(|(step, track, grid_event)| {
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: Rectangle {
-                    // x: (step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width)).round(),
-                    x: step_bounds.x + (((*step + 1) as f32 + grid_event.offset) * step_dim.width),
-                    y: step_bounds.y + (*track as f32 * step_dim.height),
-                    width: step_width,
-                    height: step_height,
-                },
-                border_radius: 0.,
-                border_width: 0.,
-                border_color: Color::TRANSPARENT,
-            },
-            Background::Color(style.step_color),
-        );
-    });
-}
 
 impl<'a, Message, Renderer> Widget<Message, Renderer> for SnapshotView<'a>
 where
@@ -216,8 +110,8 @@ where
             });
 
             let step_bounds = Rectangle {
-                height: bounds.height - 3.,
-                y: bounds.y + 2.,
+                height: bounds.height,
+                y: bounds.y,
                 ..bounds
             };
             let step_dim: Size = get_step_dimension(step_bounds, NUM_STEPS + 2, NUM_PERCS);
@@ -267,9 +161,9 @@ where
                         bounds: Rectangle {
                             // x: (bounds.x + ((division * step + 1) as f32 * step_dim.width)).round(),
                             x: bounds.x + ((division * step + 1) as f32 * step_dim.width),
-                            y: bounds.y + 1.,
+                            y: bounds.y,
                             width: step_dim.width + 1.,
-                            height: bounds.height - 2.,
+                            height: bounds.height,
                         },
                         border_radius: 0.,
                         border_width: 1.,
