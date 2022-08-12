@@ -1,26 +1,30 @@
 use super::Draggable;
 use iced_native::{
-    event, layout, mouse, overlay, widget::container, Clipboard, Element, Event, Layout, Point,
+    event, layout, mouse, touch, overlay, widget::container, Clipboard, Element, Event, Layout, Point,
     Rectangle, Shell, Size,
 };
 
 pub struct Content<'a, Message, Renderer> {
     body: Element<'a, Message, Renderer>,
     controls: Option<Element<'a, Message, Renderer>>,
+    id: usize,
     style_sheet: Box<dyn container::StyleSheet + 'a>,
-    always_show_controls: bool
+    always_show_controls: bool,
+    on_click: Option<Box<dyn Fn(usize) -> Message + 'a>>,
 }
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
 where
     Renderer: iced_native::Renderer,
 {
-    pub fn new(body: impl Into<Element<'a, Message, Renderer>>) -> Self {
+    pub fn new(body: impl Into<Element<'a, Message, Renderer>>, id: usize) -> Self {
         Self {
             body: body.into(),
             controls: None,
+            id,
             style_sheet: Default::default(),
-            always_show_controls: false
+            always_show_controls: false,
+            on_click: None,
         }
     }
 
@@ -36,6 +40,14 @@ where
 
     pub fn always_show_controls(mut self) -> Self {
         self.always_show_controls = true;
+        self
+    }
+
+    pub fn on_click<F>(mut self, f: F) -> Self
+        where
+            F: 'a + Fn(usize) -> Message,
+    {
+        self.on_click = Some(Box::new(f));
         self
     }
 }
@@ -116,6 +128,31 @@ where
         shell: &mut Shell<'_, Message>,
         is_picked: bool,
     ) -> event::Status {
+        // Manage the on click only on body
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                if let Some(on_click) = &self.on_click {
+                    let bounds = layout.bounds();
+
+                    if bounds.contains(cursor_position) {
+                        if let Some(controls) = &self.controls {
+                            let mut children = layout.children();
+                            let body_layout = children.next().unwrap();
+                            let controls_layout = children.next().unwrap();
+                            let controls_bounds = controls_layout.bounds();
+
+                            // we clicked body but out of controls
+                            if !controls_bounds.contains(cursor_position) {
+                                shell.publish(on_click(self.id));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
         let mut event_status = event::Status::Ignored;
 
         let body_layout = if let Some(controls) = &mut self.controls {
@@ -141,7 +178,7 @@ where
             event::Status::Ignored
         } else {
             self.body.on_event(
-                event,
+                event.clone(),
                 body_layout,
                 cursor_position,
                 renderer,
@@ -235,6 +272,6 @@ where
     Renderer: iced_native::Renderer,
 {
     fn from(element: T) -> Self {
-        Self::new(element)
+        Self::new(element, 0)
     }
 }
