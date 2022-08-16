@@ -1,7 +1,7 @@
 use super::Draggable;
 use iced_native::{
-    event, layout, mouse, touch, overlay, widget::container, Clipboard, Element, Event, Layout, Point,
-    Rectangle, Shell, Size,
+    event, layout, mouse, overlay, touch, widget::container, Clipboard, Element, Event, Layout,
+    Point, Rectangle, Shell, Size,
 };
 
 pub struct Content<'a, Message, Renderer> {
@@ -11,6 +11,7 @@ pub struct Content<'a, Message, Renderer> {
     style_sheet: Box<dyn container::StyleSheet + 'a>,
     always_show_controls: bool,
     on_click: Option<Box<dyn Fn(usize) -> Message + 'a>>,
+    draggable: bool,
 }
 
 impl<'a, Message, Renderer> Content<'a, Message, Renderer>
@@ -25,6 +26,7 @@ where
             style_sheet: Default::default(),
             always_show_controls: false,
             on_click: None,
+            draggable: false,
         }
     }
 
@@ -44,10 +46,15 @@ where
     }
 
     pub fn on_click<F>(mut self, f: F) -> Self
-        where
-            F: 'a + Fn(usize) -> Message,
+    where
+        F: 'a + Fn(usize) -> Message,
     {
         self.on_click = Some(Box::new(f));
+        self
+    }
+
+    pub fn set_draggable(mut self, pickable: bool) -> Self {
+        self.draggable = pickable;
         self
     }
 }
@@ -80,13 +87,7 @@ where
                 .draw(renderer, style, body_layout, cursor_position, viewport);
 
             if bounds.contains(cursor_position) || self.always_show_controls {
-                controls.draw(
-                    renderer,
-                    &style,
-                    controls_layout,
-                    cursor_position,
-                    viewport
-                );
+                controls.draw(renderer, &style, controls_layout, cursor_position, viewport);
             }
         } else {
             self.body
@@ -99,8 +100,8 @@ where
 
         if let Some(controls) = &self.controls {
             let max_size = limits.max();
-            let mut controls_layout = controls
-                .layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
+            let mut controls_layout =
+                controls.layout(renderer, &layout::Limits::new(Size::ZERO, max_size));
 
             let controls_size = controls_layout.size();
             let space_before_controls = max_size.width - controls_size.width;
@@ -136,9 +137,9 @@ where
                     let bounds = layout.bounds();
 
                     if bounds.contains(cursor_position) {
-                        if let Some(controls) = &self.controls {
+                        if let Some(_controls) = &self.controls {
                             let mut children = layout.children();
-                            let body_layout = children.next().unwrap();
+                            let _body_layout = children.next().unwrap();
                             let controls_layout = children.next().unwrap();
                             let controls_bounds = controls_layout.bounds();
 
@@ -146,6 +147,9 @@ where
                             if !controls_bounds.contains(cursor_position) {
                                 shell.publish(on_click(self.id));
                             }
+                        } else {
+                            // we publish the click message anyway
+                            shell.publish(on_click(self.id));
                         }
                     }
                 }
@@ -166,7 +170,7 @@ where
                 cursor_position,
                 renderer,
                 clipboard,
-                shell
+                shell,
             );
 
             body_layout
@@ -206,7 +210,9 @@ where
         };
 
         if body_layout.bounds().contains(cursor_position) {
-            mouse_interaction = mouse::Interaction::Grab;
+            if self.draggable {
+                mouse_interaction = mouse::Interaction::Grab;
+            }
         }
 
         if let Some(controls) = &self.controls {
@@ -216,7 +222,12 @@ where
             let hover_controls = controls_layout.bounds().contains(cursor_position);
 
             if hover_controls {
-                mouse_interaction = controls.mouse_interaction(controls_layout, cursor_position, viewport, renderer);
+                mouse_interaction = controls.mouse_interaction(
+                    controls_layout,
+                    cursor_position,
+                    viewport,
+                    renderer,
+                );
             }
         }
 
@@ -246,6 +257,10 @@ where
     Renderer: iced_native::Renderer,
 {
     fn can_be_dragged_at(&self, layout: Layout<'_>, cursor_position: Point) -> bool {
+        if !self.draggable {
+            return false;
+        }
+
         if self.controls.is_some() {
             let mut children = layout.children();
             let body_layout = children.next().unwrap();
