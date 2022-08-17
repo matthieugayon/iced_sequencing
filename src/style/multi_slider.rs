@@ -57,7 +57,7 @@ impl StyleSheet for Default {
 
     fn highlight(&self, primary_color: Color) -> Slider {
         Slider {
-            color: primary_color,
+            color: lighten(primary_color, 0.25),
             marker_height: 1.,
             marker_color: primary_color,
         }

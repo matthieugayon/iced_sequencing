@@ -1,6 +1,6 @@
 use iced_native::{
     event, layout, mouse, touch, Clipboard, Color,
-    Element, Event, Layout, Length, Padding, Shell,
+    Element, Event, Layout, Length, Shell,
     Point, Rectangle, Size, Widget, renderer,Background
 };
 use std::ops::RangeInclusive;
@@ -18,7 +18,6 @@ pub struct MultiSlider<'a, T, Message> {
     width: Length,
     height: Length,
     spacing: u16,
-    padding: Padding,
     base_color: Color,
     style_sheet: Box<dyn StyleSheet + 'a>,
 }
@@ -62,7 +61,6 @@ where
             width: Length::Fill,
             height: Length::Fill,
             spacing: 0,
-            padding: Padding::ZERO,
             base_color,
             style_sheet: Default::default(),
         }
@@ -80,11 +78,6 @@ where
 
     pub fn spacing(mut self, units: u16) -> Self {
         self.spacing = units;
-        self
-    }
-
-    pub fn padding<P: Into<Padding>>(mut self, padding: P) -> Self {
-        self.padding = padding.into();
         self
     }
 

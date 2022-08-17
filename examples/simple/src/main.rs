@@ -197,7 +197,6 @@ impl Sandbox for App {
                 hex("ff7d00")
             )
             .spacing(2)
-            .padding(Padding::from([6, 4]))
             .height(Length::from(Length::Units(120)))
             .step(0.01);
 
