@@ -31,7 +31,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         _cursor_position: Point,
         grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
-        mouse_interaction: mouse::Interaction,
+        _mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
         style_sheet: &Self::Style,
