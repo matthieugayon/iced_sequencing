@@ -10,9 +10,15 @@ use iced_native::{
     Padding, Point, Rectangle, Shell, Size, Widget,
 };
 
+pub enum SelectionState {
+    Selected(),
+    NotSelected(),
+    Dirty(),
+}
+
 pub struct SnapshotView<'a> {
     pattern: GridPattern,
-    selected: bool,
+    selection_state: SelectionState,
     width: Length,
     height: Length,
     style_sheet: Box<dyn StyleSheet + 'a>,
@@ -23,7 +29,7 @@ impl<'a> SnapshotView<'a> {
     pub fn new(pattern: GridPattern, width: Length, height: Length) -> Self {
         SnapshotView {
             pattern,
-            selected: false,
+            selection_state: SelectionState::NotSelected(),
             width,
             height,
             style_sheet: Default::default(),
@@ -56,8 +62,8 @@ impl<'a> SnapshotView<'a> {
         self
     }
 
-    pub fn select(mut self, select: bool) -> Self {
-        self.selected = select;
+    pub fn set_selection_state(mut self, state: SelectionState) -> Self {
+        self.selection_state = state;
         self
     }
 }
@@ -75,7 +81,7 @@ where
         self.height
     }
 
-    fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(&self, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let limits = limits.width(self.width).height(self.height);
         let size = limits.resolve(Size::ZERO);
         layout::Node::new(size)
@@ -84,18 +90,16 @@ where
     fn draw(
         &self,
         renderer: &mut Renderer,
-        style: &renderer::Style,
+        _style: &renderer::Style,
         layout: Layout<'_>,
-        cursor_position: Point,
-        viewport: &Rectangle,
+        _cursor_position: Point,
+        _viewport: &Rectangle,
     ) {
         {
             let bounds = layout.bounds();
             let pattern = &self.pattern;
-            let selected = self.selected;
             let style: &dyn StyleSheet = self.style_sheet.as_ref();
-            let cursor_position = cursor_position;
-            let viewport = viewport;
+
             let mut events: Vec<(usize, usize, GridEvent)> = pattern
                 .data
                 .iter()
@@ -117,11 +121,13 @@ where
             let step_dim: Size = get_step_dimension(step_bounds, NUM_STEPS + 2, NUM_PERCS);
             let step_width = 0.85 * step_dim.width;
             let step_height = (step_dim.height - 1.).floor();
-            let style: Style = if selected {
-                style.selected()
-            } else {
-                style.default()
+
+            let style: Style = match self.selection_state {
+                SelectionState::Selected() => style.selected(),
+                SelectionState::NotSelected() => style.default(),
+                SelectionState::Dirty() => style.dirty(),
             };
+
             let division: usize = {
                 if step_dim.width <= 2. {
                     8
@@ -196,20 +202,20 @@ where
 
     fn on_event(
         &mut self,
-        event: Event,
-        layout: Layout<'_>,
-        cursor_position: Point,
-        renderer: &Renderer,
-        clipboard: &mut dyn Clipboard,
-        shell: &mut Shell<'_, Message>,
+        _event: Event,
+        _layout: Layout<'_>,
+        _cursor_position: Point,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        _shell: &mut Shell<'_, Message>,
     ) -> event::Status {
         event::Status::Ignored
     }
 
     fn mouse_interaction(
         &self,
-        layout: Layout<'_>,
-        cursor_position: Point,
+        _layout: Layout<'_>,
+        _cursor_position: Point,
         _viewport: &Rectangle,
         _renderer: &Renderer,
     ) -> mouse::Interaction {
