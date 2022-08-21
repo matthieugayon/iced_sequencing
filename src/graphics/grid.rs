@@ -310,8 +310,8 @@ fn draw_steps(
 
         // mutes
         if mutes[*track] {
-            event_bg_color.a = 0.2;
-            slider_fill_color.a = 0.2;
+            event_bg_color.a = 0.05;
+            slider_fill_color.a = 0.05;
         }
 
         if grid_event.selected {
@@ -323,7 +323,16 @@ fn draw_steps(
                 },
                 step_size,
             );
-            frame.fill(&selected_countour, style.event.contour_bg_color);
+
+            // select must be less transparent
+            let mut contour_bg_color = style.event.contour_bg_color;
+            if mutes[*track] {
+                contour_bg_color.a = 0.15;
+                event_bg_color.a = 0.15;
+                slider_fill_color.a = 0.15;
+            }
+
+            frame.fill(&selected_countour, contour_bg_color);
 
             // event with fill & stroke
             let event = Path::rectangle(
@@ -336,6 +345,7 @@ fn draw_steps(
                     height: step_size.height - (style.event.contour_width * 2.),
                 },
             );
+
             frame.fill(&event, event_bg_color);
 
             let slider_inner_height = step_size.height - (style.event.contour_width * 2.);
@@ -353,6 +363,7 @@ fn draw_steps(
                     height: velocity_height,
                 },
             );
+
             frame.fill(&inner_slider, slider_fill_color);
             frame.stroke(
                 &event,
