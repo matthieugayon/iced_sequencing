@@ -619,7 +619,7 @@ pub enum Target {
     NONE
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum GridMessage {
     Add((usize, usize, f32)), // empty selection, add event, select event => COMMITS STATE
     Delete((usize, usize)), // delete selection

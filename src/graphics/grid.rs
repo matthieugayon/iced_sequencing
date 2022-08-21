@@ -1,4 +1,5 @@
 use crate::{core::grid::GridEvent, native::grid};
+use colors_transform::Color;
 use iced_core::mouse;
 use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
@@ -31,9 +32,10 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
         _cursor_position: Point,
         grid_pattern: &GridPattern,
         selection: Option<Rectangle>,
-        mouse_interaction: mouse::Interaction,
+        _mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
+        mutes: [bool; NUM_PERCS],
         style_sheet: &Self::Style,
         grid_cache: &Cache,
         event_cache: &Cache,
@@ -60,6 +62,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
                 step_size,
                 is_playing,
                 highlight,
+                mutes,
                 &style,
             )
         });
@@ -69,7 +72,7 @@ impl<B: Backend> grid::Renderer for Renderer<B> {
 
         // 2. highlighted steps
         if is_playing {
-            canvas_primitives.push(draw_highlight(drawable_area.size(), highlight, &style));
+            canvas_primitives.push(draw_highlight(drawable_area.size(), highlight, mutes, &style));
         }
 
         // 3. events
@@ -228,12 +231,17 @@ fn draw_grid(
 fn draw_highlight(
     size: Size,
     highlight: [usize; NUM_PERCS],
+    mutes: [bool; NUM_PERCS],
     style: &Style,
 ) -> Primitive {
     let mut frame = Frame::new(size);
 
     let highlighted_steps = Path::new(|path| {
         for (track , highlighted_step) in highlight.iter().enumerate() {
+            if mutes[track] {
+                continue;
+            }
+
             let event_bounds = get_event_bounds(*highlighted_step, track, 0., size);
             path.rectangle(event_bounds.position(), event_bounds.size());
         }
@@ -253,6 +261,7 @@ fn draw_steps(
     step_size: Size,
     is_playing: bool,
     highlight: [usize; NUM_PERCS],
+    mutes: [bool; NUM_PERCS],
     style: &Style,
 ) {
     let mut events: Vec<(usize, usize, GridEvent)> = grid_pattern
@@ -281,8 +290,7 @@ fn draw_steps(
         let step_position = get_event_bounds(*step, *track, 0., size);
 
         // Color definitions
-
-        let event_bg_color = match style.event.bg_color {
+        let mut event_bg_color = match style.event.bg_color {
             GridColor::Simple(color) => color,
             GridColor::Multitrack(color_array) => color_array[*track],
         };
@@ -295,10 +303,16 @@ fn draw_steps(
             }
         };
 
-        let slider_fill_color = match slider_bg_color {
+        let mut slider_fill_color = match slider_bg_color {
             GridColor::Simple(color) => color,
             GridColor::Multitrack(color_array) => color_array[*track],
         };
+
+        // mutes
+        if mutes[*track] {
+            event_bg_color.a = 0.2;
+            slider_fill_color.a = 0.2;
+        }
 
         if grid_event.selected {
             // selected event contour

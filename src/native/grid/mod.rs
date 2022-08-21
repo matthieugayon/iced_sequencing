@@ -129,6 +129,7 @@ pub struct State {
     grid_cache: canvas::Cache,
     event_cache: canvas::Cache,
     highlight_cache: canvas::Cache,
+    mutes: [bool; NUM_PERCS],
 }
 
 impl State {
@@ -147,6 +148,7 @@ impl State {
             grid_cache: Default::default(),
             event_cache: Default::default(),
             highlight_cache: Default::default(),
+            mutes: [false; NUM_PERCS],
         }
     }
 
@@ -194,6 +196,11 @@ impl State {
                 None => {}
             }
         }
+    }
+
+    pub fn set_mute(&mut self, pidx: usize, mute: bool) {
+        self.event_cache.clear();
+        self.mutes[NUM_PERCS - pidx - 1] = mute;
     }
 }
 
@@ -378,6 +385,7 @@ where
             self.state.context.mouse_interaction,
             self.state.is_playing,
             self.state.highlight,
+            self.state.mutes,
             &self.style,
             &self.state.grid_cache,
             &self.state.event_cache,
@@ -399,6 +407,7 @@ pub trait Renderer: iced_native::Renderer {
         mouse_interaction: mouse::Interaction,
         is_playing: bool,
         highlight: [usize; NUM_PERCS],
+        mutes: [bool; NUM_PERCS],
         style: &Self::Style,
         grid_cache: &canvas::Cache,
         event_cache: &canvas::Cache,

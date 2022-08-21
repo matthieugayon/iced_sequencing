@@ -52,6 +52,11 @@ where
     pub fn remove(&mut self, index: usize) {
         self.panes.remove(index);
     }
+
+    pub fn clear(&mut self) {
+        self.panes.clear();
+    }
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
