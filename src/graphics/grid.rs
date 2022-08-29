@@ -1,5 +1,4 @@
 use crate::{core::grid::GridEvent, native::grid};
-use colors_transform::Color;
 use iced_core::mouse;
 use iced_graphics::canvas::{Cache, Frame, Geometry, LineCap, Path, Stroke};
 use iced_graphics::{Backend, Primitive, Renderer};
