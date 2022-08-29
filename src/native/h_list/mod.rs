@@ -281,11 +281,12 @@ where
             .iter()
             .enumerate()
             .filter_map(|(pane, element)| {
-                let area_width = size.width / number_of_elements as f32;
+                let pane_acc_width = size.width - ((number_of_elements as f32 - 1.) * self.spacing as f32);
+                let pane_width = pane_acc_width / number_of_elements as f32;
                 let region = Rectangle {
-                    x: ((pane as f32 * area_width) + self.spacing as f32).round(),
+                    x: (pane as f32 * (pane_width + self.spacing as f32)).round(),
                     y: 0.,
-                    width: area_width.round() - 2. * self.spacing as f32,
+                    width: pane_width,
                     height: size.height,
                 };
 
